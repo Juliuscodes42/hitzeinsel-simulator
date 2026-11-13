@@ -23,6 +23,7 @@ import {
   formatTemp,
 } from './components/format.ts'
 import { FormulaDialog } from './components/FormulaDialog.tsx'
+import { OptimizerPanel } from './components/OptimizerPanel.tsx'
 import { PlacePicker, type Place } from './components/PlacePicker.tsx'
 import { Slider } from './components/Slider.tsx'
 import { TemperatureLegend } from './components/TemperatureLegend.tsx'
@@ -354,6 +355,24 @@ export default function App() {
               onHourChange={setHour}
               sunrise={sunrise}
               sunset={sunset}
+            />
+          </section>
+
+          <section className="panel" aria-labelledby="vorschlag">
+            <div>
+              <h2 id="vorschlag">Vorschlag berechnen</h2>
+              <p className="panel-lead">
+                Der Optimierer sucht für das Viertel ohne Maßnahmen die Kombination, die mit dem
+                Budget am stärksten kühlt.
+              </p>
+            </div>
+            <OptimizerPanel
+              grid={baseGrid}
+              weather={liveWeather}
+              onApply={(cells) => {
+                setMeasures(NO_MEASURES)
+                setOverrides(cells)
+              }}
             />
           </section>
 

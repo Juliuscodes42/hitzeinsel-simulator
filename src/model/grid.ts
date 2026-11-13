@@ -91,6 +91,20 @@ export function conditionsFor(cell: GridCell, density: number): CellConditions {
   }
 }
 
+/**
+ * Bedingungen für die Zelle an einer Stelle des Rasters. Mit `cell` lässt sich
+ * durchspielen, was wäre, wenn dort eine andere Oberfläche läge.
+ */
+export function conditionsAt(
+  grid: CityGrid,
+  index: number,
+  cell: GridCell = grid.cells[index],
+): CellConditions {
+  if (MATERIALS[cell.surface].isRoof) return conditionsFor(cell, 0)
+  const density = localBuildingDensity(grid, index % grid.width, Math.floor(index / grid.width))
+  return conditionsFor(cell, Math.round(density / DENSITY_STEP) * DENSITY_STEP)
+}
+
 export interface GridResult {
   /** Tagesgang jeder Zelle, in derselben Reihenfolge wie grid.cells. */
   cells: DayResult[]
@@ -103,15 +117,11 @@ export interface GridResult {
 export function simulateGrid(grid: CityGrid, weather: Weather): GridResult {
   const cache = new Map<string, DayResult>()
   const cells = grid.cells.map((cell, index) => {
-    const x = index % grid.width
-    const y = Math.floor(index / grid.width)
-    const density = MATERIALS[cell.surface].isRoof
-      ? 0
-      : Math.round(localBuildingDensity(grid, x, y) / DENSITY_STEP) * DENSITY_STEP
-    const key = `${cell.surface}|${cell.mist}|${density.toFixed(2)}`
+    const conditions = conditionsAt(grid, index, cell)
+    const key = `${cell.surface}|${cell.mist}|${conditions.skyViewFactor.toFixed(3)}`
     let result = cache.get(key)
     if (!result) {
-      result = simulateDay(conditionsFor(cell, density), weather)
+      result = simulateDay(conditions, weather)
       cache.set(key, result)
     }
     return result

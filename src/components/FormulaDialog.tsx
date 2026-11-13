@@ -129,6 +129,15 @@ export function FormulaDialog({ open, onClose, weather, hour }: FormulaDialogPro
             oberflächlich ab. Der Rest wird auf der Fläche A zurückgehalten.
           </p>
 
+          <h3>7. Optimierer</h3>
+          <p>
+            Für jede Fläche wird berechnet, um wie viel Kelvin jede mögliche Maßnahme sie abkühlt
+            und was das kostet. Das Budget wird dann in der Reihenfolge „meiste Kühlung pro Euro
+            zuerst" ausgegeben (Greedy-Verfahren für ein Rucksackproblem). Weil das Modell
+            Nachbarflächen nicht koppelt, hängt der Nutzen einer Maßnahme nur von ihrer eigenen
+            Fläche ab. Die Kosten je Quadratmeter sind grobe eigene Annahmen.
+          </p>
+
           <h3>Rechenbeispiel: Energieflüsse um {formatHour(hour)} Uhr</h3>
           <p>Freie, unverschattete Fläche mit den aktuellen Wetter-Reglern. Werte in W/m².</p>
           <div className="table-scroll">

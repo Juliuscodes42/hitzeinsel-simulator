@@ -27,3 +27,6 @@ export function formatHour(hour: number): string {
 /** Wassermenge in Litern mit Tausenderpunkten, z. B. "512.000 L". */
 export const formatLitres = (litres: number): string =>
   `${Math.round(litres).toLocaleString('de-DE')} L`
+
+/** Geldbetrag in Euro mit Tausenderpunkten, z. B. "150.000 €". */
+export const formatEuro = (euro: number): string => `${Math.round(euro).toLocaleString('de-DE')} €`
