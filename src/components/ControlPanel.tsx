@@ -1,16 +1,21 @@
 import { shortwaveDown, type Weather } from '../model/atmosphere.ts'
 import type { DistrictParams, Measures } from '../model/district.ts'
 import { formatNumber, formatPercent } from './format.ts'
+import { WEATHER_LIMITS } from '../model/observedWeather.ts'
 import { Slider } from './Slider.tsx'
-
-/** Unterschied zwischen Tageshöchst- und Nachttiefstwert der Luft in K. */
-const DAY_NIGHT_RANGE = 14
+import { WeatherSource, type WeatherLocation } from './WeatherSource.tsx'
 
 export type GridSource = 'example' | 'place'
 
 interface ControlPanelProps {
   weather: Weather
   onWeatherChange: (weather: Weather) => void
+  /** Ort, für den echtes Wetter geladen werden kann. */
+  weatherLocation: WeatherLocation
+  /** Beschreibung des geladenen Wetters, null = Standardtag. */
+  weatherLabel: string | null
+  onWeatherLoaded: (weather: Weather, label: string) => void
+  onWeatherReset: () => void
   /** Regenmenge eines Starkregens in mm. */
   rainMm: number
   onRainChange: (rainMm: number) => void
@@ -30,6 +35,10 @@ interface ControlPanelProps {
 export function ControlPanel({
   weather,
   onWeatherChange,
+  weatherLocation,
+  weatherLabel,
+  onWeatherLoaded,
+  onWeatherReset,
   rainMm,
   onRainChange,
   mode,
@@ -68,13 +77,19 @@ export function ControlPanel({
     <div className="controls">
       <section className="panel" aria-labelledby="wetter">
         <h2 id="wetter">Wetter</h2>
+        <WeatherSource
+          location={weatherLocation}
+          label={weatherLabel}
+          onLoaded={onWeatherLoaded}
+          onReset={onWeatherReset}
+        />
         <Slider
           label="Sonneneinstrahlung"
           display={`${Math.round(shortwaveDown(weather, 12))} W/m²`}
           value={weather.transmissivity}
-          min={0.2}
-          max={0.8}
-          step={0.02}
+          min={WEATHER_LIMITS.transmissivity.min}
+          max={WEATHER_LIMITS.transmissivity.max}
+          step={0.01}
           hint="Mittagswert. Niedrig = bewölkt, hoch = wolkenlos."
           onChange={(transmissivity) => onWeatherChange({ ...weather, transmissivity })}
         />
@@ -89,14 +104,15 @@ export function ControlPanel({
         />
         <Slider
           label="Höchste Lufttemperatur"
-          display={`${formatNumber(weather.tMaxC, 0)} °C`}
+          display={`${formatNumber(weather.tMaxC)} °C`}
           value={weather.tMaxC}
-          min={20}
-          max={40}
-          step={1}
-          hint={`Nachts kühlt die Luft auf ${formatNumber(weather.tMinC, 0)} °C ab.`}
+          min={WEATHER_LIMITS.tMaxC.min}
+          max={WEATHER_LIMITS.tMaxC.max}
+          step={0.5}
+          hint={`Nachts kühlt die Luft auf ${formatNumber(weather.tMinC)} °C ab.`}
           onChange={(tMaxC) =>
-            onWeatherChange({ ...weather, tMaxC, tMinC: tMaxC - DAY_NIGHT_RANGE })
+            // Der Abstand zwischen Tag und Nacht bleibt beim Verschieben erhalten.
+            onWeatherChange({ ...weather, tMaxC, tMinC: tMaxC - (weather.tMaxC - weather.tMinC) })
           }
         />
         <Slider

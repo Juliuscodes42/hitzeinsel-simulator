@@ -29,7 +29,7 @@ deaktiviert sind, stattdessen `npm.cmd test` bzw. `npm.cmd run dev` verwenden.
 3. Interaktives 20×20-Raster mit Reglern und Maßnahmen ✓
 4. 24-Stunden-Diagramm, Kennzahlen, Formel-Fenster ✓
 5. Echte Orte: Luftbild, OpenStreetMap, eigene Drohnenbilder ✓
-6. Aktuelles Wetter als Startwerte
+6. Aktuelles Wetter als Startwerte ✓
 7. Optimierer für Maßnahmen
 8. Vergleich mit Satelliten-Oberflächentemperaturen, Offline-Beispielorte
 9. Optional: KI-Erklärtext

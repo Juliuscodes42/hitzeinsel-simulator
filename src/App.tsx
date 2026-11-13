@@ -68,6 +68,7 @@ export default function App() {
   const [customImage, setCustomImage] = useState<string | null>(null)
   const [alignment, setAlignment] = useState(DEFAULT_ALIGNMENT)
   const [cellOpacity, setCellOpacity] = useState(0.65)
+  const [weatherLabel, setWeatherLabel] = useState<string | null>(null)
 
   // Beim schnellen Ziehen eines Reglers darf die Rechnung kurz hinterherhinken,
   // damit der Regler selbst flüssig bleibt.
@@ -125,6 +126,15 @@ export default function App() {
     return () => URL.revokeObjectURL(customImage)
   }, [customImage])
 
+  // Wetter wird für den geladenen Ort geholt, sonst für den Standardort Elmshorn.
+  const weatherLocation = activePlace
+    ? {
+        name: activePlace.name.split(',')[0],
+        lat: (activePlace.bbox.north + activePlace.bbox.south) / 2,
+        lon: (activePlace.bbox.east + activePlace.bbox.west) / 2,
+      }
+    : { name: 'Elmshorn', lat: DEFAULT_WEATHER.latitudeDeg, lon: 9.65 }
+
   const background = customImage
     ? { url: customImage, ...alignment }
     : activePlace
@@ -159,6 +169,16 @@ export default function App() {
         <ControlPanel
           weather={weather}
           onWeatherChange={setWeather}
+          weatherLocation={weatherLocation}
+          weatherLabel={weatherLabel}
+          onWeatherLoaded={(loaded, label) => {
+            setWeather(loaded)
+            setWeatherLabel(label)
+          }}
+          onWeatherReset={() => {
+            setWeather(DEFAULT_WEATHER)
+            setWeatherLabel(null)
+          }}
           rainMm={rainMm}
           onRainChange={setRainMm}
           mode={mode}

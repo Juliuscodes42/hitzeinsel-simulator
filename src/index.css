@@ -866,3 +866,27 @@ tbody th {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ---------- Wetterquelle ---------- */
+
+.weather-source {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.weather-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.weather-buttons .button {
+  flex: 1;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.slider-hint.is-error {
+  color: #c23b22;
+  font-weight: 600;
+}
