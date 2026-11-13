@@ -1,0 +1,101 @@
+:root {
+  --hintergrund: #f6f7f4;
+  --flaeche: #ffffff;
+  --text: #1c2420;
+  --text-leise: #5a655f;
+  --akzent: #1f7a4d;
+  --linie: #dfe3dd;
+
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--hintergrund);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hintergrund: #121614;
+    --flaeche: #1b211e;
+    --text: #e8ece9;
+    --text-leise: #9aa59f;
+    --akzent: #5fc48f;
+    --linie: #2c3530;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.startseite {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+}
+
+.kennung {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--akzent);
+}
+
+h1 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: clamp(2rem, 6vw, 3rem);
+  line-height: 1.1;
+}
+
+.untertitel {
+  margin: 0 0 2.5rem;
+  font-size: 1.15rem;
+  color: var(--text-leise);
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.schritte {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: 0.75rem;
+}
+
+.schritte li {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  color: var(--text-leise);
+}
+
+.schritte li + li {
+  border-top: 1px solid var(--linie);
+}
+
+.schritte li.fertig {
+  color: var(--text);
+}
+
+.schritte li.fertig span[aria-hidden] {
+  color: var(--akzent);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
