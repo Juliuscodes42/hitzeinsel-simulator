@@ -49,6 +49,21 @@ describe('Maßnahmen', () => {
     expect(applyMeasures(base, NO_MEASURES, ranks)).toEqual(base)
   })
 
+  test('ein Parkplatz aus Asphalt lässt sich entsiegeln, eine Straße nicht', () => {
+    const grid: CityGrid = {
+      width: 2,
+      height: 1,
+      cellSizeM: 10,
+      cells: [
+        { surface: 'asphalt', mist: false },
+        { surface: 'asphalt', mist: false, street: true },
+      ],
+    }
+    const result = applyMeasures(grid, { ...NO_MEASURES, unsealing: 1 }, [0.5, 0.5])
+    expect(result.cells[0].surface).toBe('permeable')
+    expect(result.cells[1].surface).toBe('asphalt')
+  })
+
   test('100 % Dachbegrünung lässt kein dunkles Dach übrig', () => {
     const result = applyMeasures(base, { ...NO_MEASURES, greenRoofs: 1 }, ranks)
     expect(count(result, 'roof')).toBe(0)

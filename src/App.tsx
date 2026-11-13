@@ -7,10 +7,12 @@
  *          → Simulation beider Raster → Raster-Ansicht und Kennzahlen
  */
 
-import { useCallback, useDeferredValue, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { DEFAULT_ALIGNMENT } from './components/alignment.ts'
+import { BackgroundControls } from './components/BackgroundControls.tsx'
 import { BrushPalette, type Brush } from './components/BrushPalette.tsx'
 import { CityGridView, type ViewMode } from './components/CityGridView.tsx'
-import { ControlPanel } from './components/ControlPanel.tsx'
+import { ControlPanel, type GridSource } from './components/ControlPanel.tsx'
 import { DayChart } from './components/DayChart.tsx'
 import {
   formatDelta,
@@ -21,9 +23,11 @@ import {
   formatTemp,
 } from './components/format.ts'
 import { FormulaDialog } from './components/FormulaDialog.tsx'
+import { PlacePicker, type Place } from './components/PlacePicker.tsx'
 import { Slider } from './components/Slider.tsx'
 import { TemperatureLegend } from './components/TemperatureLegend.tsx'
 import { MATERIALS } from './data/materials.ts'
+import { IMAGERY_ATTRIBUTION, OSM_ATTRIBUTION } from './data/places.ts'
 import { DEFAULT_WEATHER, airTemperatureC, daylight } from './model/atmosphere.ts'
 import {
   NO_MEASURES,
@@ -58,6 +62,12 @@ export default function App() {
   const [inspected, setInspected] = useState<number | null>(null)
   const [rainMm, setRainMm] = useState(40)
   const [formulasOpen, setFormulasOpen] = useState(false)
+  // Echter Ort und Bild unter dem Raster
+  const [mode, setMode] = useState<GridSource>('example')
+  const [place, setPlace] = useState<Place | null>(null)
+  const [customImage, setCustomImage] = useState<string | null>(null)
+  const [alignment, setAlignment] = useState(DEFAULT_ALIGNMENT)
+  const [cellOpacity, setCellOpacity] = useState(0.65)
 
   // Beim schnellen Ziehen eines Reglers darf die Rechnung kurz hinterherhinken,
   // damit der Regler selbst flüssig bleibt.
@@ -66,7 +76,11 @@ export default function App() {
   const liveMeasures = useDeferredValue(measures)
 
   // Ist-Zustand: das Viertel ohne Maßnahmen.
-  const baseGrid = useMemo(() => generateDistrict(liveDistrict), [liveDistrict])
+  const activePlace = mode === 'place' ? place : null
+  const baseGrid = useMemo(
+    () => activePlace?.grid ?? generateDistrict(liveDistrict),
+    [activePlace, liveDistrict],
+  )
   const ranks = useMemo(
     () => cellRanks(liveDistrict.seed, baseGrid.cells.length),
     [liveDistrict.seed, baseGrid.cells.length],
@@ -105,6 +119,18 @@ export default function App() {
     [brush, grid],
   )
 
+  // Adresse des hochgeladenen Bilds wieder freigeben, wenn es ersetzt wird.
+  useEffect(() => {
+    if (!customImage) return
+    return () => URL.revokeObjectURL(customImage)
+  }, [customImage])
+
+  const background = customImage
+    ? { url: customImage, ...alignment }
+    : activePlace
+      ? { url: activePlace.imageUrl, ...DEFAULT_ALIGNMENT }
+      : null
+
   const baseMean = meanSurfaceTempAt(baseResult, hour)
   const mean = meanSurfaceTempAt(result, hour)
   const hottest = Math.max(...result.cells.map((cell) => surfaceTempAt(cell, hour)))
@@ -135,6 +161,16 @@ export default function App() {
           onWeatherChange={setWeather}
           rainMm={rainMm}
           onRainChange={setRainMm}
+          mode={mode}
+          onModeChange={(next) => {
+            if (next !== mode) setOverrides(NO_OVERRIDES)
+            setMode(next)
+          }}
+          placeSummary={
+            place
+              ? `${place.name}. Flächen aus OpenStreetMap, ${formatPercent(place.guessedShare)} der Zellen sind geschätzt und sollten geprüft werden.`
+              : null
+          }
           district={district}
           onDistrictChange={(next) => {
             // Ein neu gewürfeltes Viertel passt nicht mehr zu den gemalten Zellen.
@@ -147,6 +183,25 @@ export default function App() {
         />
 
         <div className="stage">
+          {mode === 'place' && (
+            <section className="panel" aria-labelledby="ort">
+              <div>
+                <h2 id="ort">Ort wählen</h2>
+                <p className="panel-lead">
+                  Der gelbe Rahmen zeigt 200 m × 200 m. Gebäude, Straßen, Parkplätze und
+                  Grünflächen kommen aus OpenStreetMap. Was dort fehlt, lässt sich unten mit dem
+                  Pinsel nachtragen.
+                </p>
+              </div>
+              <PlacePicker
+                onLoaded={(loaded) => {
+                  setPlace(loaded)
+                  setOverrides(NO_OVERRIDES)
+                }}
+              />
+            </section>
+          )}
+
           <section className="kpis" aria-label="Kennzahlen">
             <div className="kpi">
               <p className="kpi-label">Ohne Maßnahmen (Ist)</p>
@@ -213,6 +268,8 @@ export default function App() {
               result={result}
               hour={hour}
               view={view}
+              background={background}
+              cellOpacity={cellOpacity}
               painting={brush !== null}
               onPaint={paint}
               onInspect={setInspected}
@@ -228,6 +285,12 @@ export default function App() {
                 : 'Zelle berühren oder mit den Pfeiltasten ansteuern, um Werte zu sehen. Eine Zelle ist 10 m × 10 m groß.'}
             </p>
 
+            {activePlace && (
+              <p className="attribution">
+                {customImage ? OSM_ATTRIBUTION : `${IMAGERY_ATTRIBUTION} · ${OSM_ATTRIBUTION}`}
+              </p>
+            )}
+
             {view === 'temperature' && <TemperatureLegend />}
 
             <Slider
@@ -239,6 +302,19 @@ export default function App() {
               step={0.5}
               hint="Um 4 Uhr zeigt sich der nächtliche Hitzestau, um 14 bis 15 Uhr die größte Hitze."
               onChange={setHour}
+            />
+
+            <BackgroundControls
+              hasBackground={background !== null}
+              cellOpacity={cellOpacity}
+              onCellOpacityChange={setCellOpacity}
+              hasCustomImage={customImage !== null}
+              onCustomImage={(file) => {
+                setCustomImage(file ? URL.createObjectURL(file) : null)
+                setAlignment(DEFAULT_ALIGNMENT)
+              }}
+              alignment={alignment}
+              onAlignmentChange={setAlignment}
             />
           </section>
 

@@ -23,9 +23,9 @@ export interface Measures {
   greenRoofs: number
   /** Cool Roofs: dunkles Dach wird hell gestrichen. */
   coolRoofs: number
-  /** Laubbäume auf versiegelten Höfen und Plätzen. */
+  /** Laubbäume auf versiegelten Höfen, Plätzen und Parkplätzen. */
   trees: number
-  /** Entsiegelung: Pflaster wird Rasengitter. */
+  /** Entsiegelung: Pflaster und Parkplatz-Asphalt werden Rasengitter. */
   unsealing: number
   /** Sprühnebel auf Straßen und Plätzen. */
   mist: number
@@ -96,7 +96,7 @@ export function generateDistrict(
       else if (sealingNoise[index] < params.sealing) surface = 'concrete'
       else if (treeNoise[index] < EXISTING_TREE_SHARE) surface = 'tree'
       else surface = 'grass'
-      cells.push({ surface, mist: false })
+      cells.push(isStreet(x, y) ? { surface, mist: false, street: true } : { surface, mist: false })
     }
   }
   return { width, height, cellSizeM, cells }
@@ -126,7 +126,8 @@ export function applyMeasures(base: CityGrid, measures: Measures, ranks: number[
     if (surface === 'roof') {
       if (rank < measures.greenRoofs) surface = 'greenRoof'
       else if (rank < measures.greenRoofs + measures.coolRoofs) surface = 'coolRoof'
-    } else if (surface === 'concrete') {
+    } else if (!cell.street && (surface === 'concrete' || surface === 'asphalt')) {
+      // Höfe, Plätze und Parkplätze, aber keine Straßen.
       if (rank < measures.trees) surface = 'tree'
       else if (rank < measures.trees + measures.unsealing) surface = 'permeable'
     }
@@ -136,7 +137,7 @@ export function applyMeasures(base: CityGrid, measures: Measures, ranks: number[
     // Eigener Rang (gespiegelt), damit Nebel nicht dieselben Zellen bevorzugt.
     const mist = cell.mist || (sealedGround && 1 - rank < measures.mist)
 
-    return { surface, mist }
+    return cell.street ? { surface, mist, street: true } : { surface, mist }
   })
   return { ...base, cells }
 }

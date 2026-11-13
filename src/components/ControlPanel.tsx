@@ -6,12 +6,19 @@ import { Slider } from './Slider.tsx'
 /** Unterschied zwischen Tageshöchst- und Nachttiefstwert der Luft in K. */
 const DAY_NIGHT_RANGE = 14
 
+export type GridSource = 'example' | 'place'
+
 interface ControlPanelProps {
   weather: Weather
   onWeatherChange: (weather: Weather) => void
   /** Regenmenge eines Starkregens in mm. */
   rainMm: number
   onRainChange: (rainMm: number) => void
+  /** Woher das Raster kommt: erzeugtes Beispielviertel oder echter Ort. */
+  mode: GridSource
+  onModeChange: (mode: GridSource) => void
+  /** Kurzbeschreibung des geladenen Orts, falls vorhanden. */
+  placeSummary: string | null
   district: DistrictParams
   onDistrictChange: (district: DistrictParams) => void
   measures: Measures
@@ -25,6 +32,9 @@ export function ControlPanel({
   onWeatherChange,
   rainMm,
   onRainChange,
+  mode,
+  onModeChange,
+  placeSummary,
   district,
   onDistrictChange,
   measures,
@@ -103,6 +113,29 @@ export function ControlPanel({
 
       <section className="panel" aria-labelledby="stadt">
         <h2 id="stadt">Stadtstruktur</h2>
+        <div className="toggle toggle-wide" role="group" aria-label="Quelle des Rasters">
+          <button
+            type="button"
+            aria-pressed={mode === 'example'}
+            onClick={() => onModeChange('example')}
+          >
+            Beispielviertel
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === 'place'}
+            onClick={() => onModeChange('place')}
+          >
+            Echter Ort
+          </button>
+        </div>
+        {mode === 'place' ? (
+          <p className="slider-hint">
+            {placeSummary ??
+              'Rechts einen Ort suchen und den Ausschnitt laden. Bis dahin wird das Beispielviertel gezeigt.'}
+          </p>
+        ) : (
+          <>
         <Slider
           label="Versiegelungsgrad"
           display={formatPercent(district.sealing)}
@@ -130,6 +163,8 @@ export function ControlPanel({
         >
           Anderes Viertel würfeln
         </button>
+          </>
+        )}
       </section>
 
       <section className="panel" aria-labelledby="massnahmen">
@@ -151,11 +186,11 @@ export function ControlPanel({
           'Heller Anstrich auf den übrigen Dächern.',
           coolRoofLimit,
         )}
-        {percentSlider('Laubbäume', 'trees', 'Anteil der gepflasterten Höfe und Plätze.')}
+        {percentSlider('Laubbäume', 'trees', 'Anteil der versiegelten Höfe, Plätze und Parkplätze.')}
         {percentSlider(
           'Entsiegelung',
           'unsealing',
-          'Rasengitter statt Pflaster auf den übrigen Flächen.',
+          'Rasengitter statt Pflaster oder Asphalt auf den übrigen Flächen.',
           unsealingLimit,
         )}
         {percentSlider('Sprühnebel', 'mist', 'Auf Straßen und Pflaster, 10 bis 20 Uhr.')}

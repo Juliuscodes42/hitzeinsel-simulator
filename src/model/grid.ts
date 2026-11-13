@@ -19,6 +19,8 @@ import {
 export interface GridCell {
   surface: SurfaceType
   mist: boolean
+  /** Verkehrsfläche (Straße, Weg): Maßnahmen bauen sie nicht um. */
+  street?: boolean
 }
 
 export interface CityGrid {

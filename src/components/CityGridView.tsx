@@ -7,12 +7,24 @@ import { formatTemp } from './format.ts'
 
 export type ViewMode = 'temperature' | 'surface'
 
+/** Bild, das unter dem Raster liegt (Luftbild oder eigenes Foto). */
+export interface GridBackground {
+  url: string
+  scale: number
+  offsetX: number
+  offsetY: number
+  rotation: number
+}
+
 interface CityGridViewProps {
   grid: CityGrid
   result: GridResult
   /** Uhrzeit, deren Temperaturen angezeigt werden. */
   hour: number
   view: ViewMode
+  background: GridBackground | null
+  /** Deckkraft der Zellenfarben über dem Bild (0–1). */
+  cellOpacity: number
   /** Ist ein Pinsel gewählt? Dann malt Klicken und Ziehen. */
   painting: boolean
   onPaint: (index: number) => void
@@ -29,6 +41,8 @@ export function CityGridView({
   result,
   hour,
   view,
+  background,
+  cellOpacity,
   painting,
   onPaint,
   onInspect,
@@ -83,10 +97,25 @@ export function CityGridView({
   }
 
   return (
+    <div className="city-grid-wrap">
+      {background && (
+        <img
+          className="city-grid-bg"
+          src={background.url}
+          alt=""
+          draggable={false}
+          style={{
+            transform: `translate(${background.offsetX}%, ${background.offsetY}%) rotate(${background.rotation}deg) scale(${background.scale})`,
+          }}
+        />
+      )}
     <div
       ref={container}
-      className={`city-grid${painting ? ' is-painting' : ''}`}
-      style={{ gridTemplateColumns: `repeat(${grid.width}, 1fr)` }}
+      className={`city-grid${painting ? ' is-painting' : ''}${background ? ' has-background' : ''}`}
+      style={{
+        gridTemplateColumns: `repeat(${grid.width}, 1fr)`,
+        ['--cell-opacity' as string]: background ? cellOpacity : 1,
+      }}
       role="group"
       aria-label="Stadtraster. Mit den Pfeiltasten bewegen, mit Enter malen."
       onPointerDown={handlePointerDown}
@@ -129,6 +158,7 @@ export function CityGridView({
           />
         )
       })}
+    </div>
     </div>
   )
 }
