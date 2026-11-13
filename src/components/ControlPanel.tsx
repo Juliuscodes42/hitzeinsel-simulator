@@ -9,6 +9,9 @@ const DAY_NIGHT_RANGE = 14
 interface ControlPanelProps {
   weather: Weather
   onWeatherChange: (weather: Weather) => void
+  /** Regenmenge eines Starkregens in mm. */
+  rainMm: number
+  onRainChange: (rainMm: number) => void
   district: DistrictParams
   onDistrictChange: (district: DistrictParams) => void
   measures: Measures
@@ -20,6 +23,8 @@ interface ControlPanelProps {
 export function ControlPanel({
   weather,
   onWeatherChange,
+  rainMm,
+  onRainChange,
   district,
   onDistrictChange,
   measures,
@@ -83,6 +88,16 @@ export function ControlPanel({
           onChange={(tMaxC) =>
             onWeatherChange({ ...weather, tMaxC, tMinC: tMaxC - DAY_NIGHT_RANGE })
           }
+        />
+        <Slider
+          label="Starkregen"
+          display={`${formatNumber(rainMm, 0)} mm`}
+          value={rainMm}
+          min={10}
+          max={100}
+          step={5}
+          hint="Regenmenge eines Gewitters. Bestimmt nur den Regenrückhalt."
+          onChange={onRainChange}
         />
       </section>
 

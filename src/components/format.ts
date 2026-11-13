@@ -23,3 +23,7 @@ export function formatHour(hour: number): string {
   const m = Math.round((hour - Math.floor(hour)) * 60)
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
+
+/** Wassermenge in Litern mit Tausenderpunkten, z. B. "512.000 L". */
+export const formatLitres = (litres: number): string =>
+  `${Math.round(litres).toLocaleString('de-DE')} L`

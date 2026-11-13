@@ -11,11 +11,20 @@ import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { BrushPalette, type Brush } from './components/BrushPalette.tsx'
 import { CityGridView, type ViewMode } from './components/CityGridView.tsx'
 import { ControlPanel } from './components/ControlPanel.tsx'
-import { formatDelta, formatHour, formatPercent, formatTemp } from './components/format.ts'
+import { DayChart } from './components/DayChart.tsx'
+import {
+  formatDelta,
+  formatHour,
+  formatLitres,
+  formatNumber,
+  formatPercent,
+  formatTemp,
+} from './components/format.ts'
+import { FormulaDialog } from './components/FormulaDialog.tsx'
 import { Slider } from './components/Slider.tsx'
 import { TemperatureLegend } from './components/TemperatureLegend.tsx'
 import { MATERIALS } from './data/materials.ts'
-import { DEFAULT_WEATHER, airTemperatureC } from './model/atmosphere.ts'
+import { DEFAULT_WEATHER, airTemperatureC, daylight } from './model/atmosphere.ts'
 import {
   NO_MEASURES,
   applyMeasures,
@@ -26,7 +35,14 @@ import {
   type DistrictParams,
 } from './model/district.ts'
 import { surfaceTempAt } from './model/energyBalance.ts'
-import { meanSurfaceTempAt, simulateGrid, type GridCell } from './model/grid.ts'
+import {
+  meanAlbedo,
+  meanDailyCurve,
+  meanSurfaceTempAt,
+  simulateGrid,
+  type GridCell,
+} from './model/grid.ts'
+import { rainBalance } from './model/water.ts'
 
 const DEFAULT_DISTRICT: DistrictParams = { sealing: 0.75, density: 0.35, seed: 7 }
 const NO_OVERRIDES: ReadonlyMap<number, GridCell> = new Map()
@@ -40,6 +56,8 @@ export default function App() {
   const [hour, setHour] = useState(15)
   const [view, setView] = useState<ViewMode>('temperature')
   const [inspected, setInspected] = useState<number | null>(null)
+  const [rainMm, setRainMm] = useState(40)
+  const [formulasOpen, setFormulasOpen] = useState(false)
 
   // Beim schnellen Ziehen eines Reglers darf die Rechnung kurz hinterherhinken,
   // damit der Regler selbst flüssig bleibt.
@@ -61,6 +79,9 @@ export default function App() {
 
   const baseResult = useMemo(() => simulateGrid(baseGrid, liveWeather), [baseGrid, liveWeather])
   const result = useMemo(() => simulateGrid(grid, liveWeather), [grid, liveWeather])
+  const baseCurve = useMemo(() => meanDailyCurve(baseResult), [baseResult])
+  const curve = useMemo(() => meanDailyCurve(result), [result])
+  const { sunrise, sunset } = useMemo(() => daylight(liveWeather), [liveWeather])
 
   const paint = useCallback(
     (index: number) => {
@@ -88,6 +109,11 @@ export default function App() {
   const mean = meanSurfaceTempAt(result, hour)
   const hottest = Math.max(...result.cells.map((cell) => surfaceTempAt(cell, hour)))
   const inspectedCell = inspected === null ? null : grid.cells[inspected]
+  const baseRain = rainBalance(baseGrid, rainMm)
+  const rain = rainBalance(grid, rainMm)
+  const baseAlbedo = meanAlbedo(baseGrid)
+  const albedo = meanAlbedo(grid)
+  const areaHectares = (grid.cells.length * grid.cellSizeM ** 2) / 10_000
 
   return (
     <div className="app">
@@ -98,12 +124,17 @@ export default function App() {
           Wie heiß wird ein Stadtviertel, und was bringen Bäume, Gründächer und entsiegelte
           Flächen?
         </p>
+        <button type="button" className="button" onClick={() => setFormulasOpen(true)}>
+          Formeln und Annahmen
+        </button>
       </header>
 
       <main className="layout">
         <ControlPanel
           weather={weather}
           onWeatherChange={setWeather}
+          rainMm={rainMm}
+          onRainChange={setRainMm}
           district={district}
           onDistrictChange={(next) => {
             // Ein neu gewürfeltes Viertel passt nicht mehr zu den gemalten Zellen.
@@ -134,13 +165,26 @@ export default function App() {
               <p className="kpi-note">Luft: {formatTemp(airTemperatureC(liveWeather, hour))}</p>
             </div>
             <div className="kpi">
+              <p className="kpi-label">Regenrückhalt</p>
+              <p className="kpi-value">{formatLitres(rain.retainedL)}</p>
+              <p className={`kpi-note${rain.retainedL > baseRain.retainedL + 1 ? ' is-cooler' : ''}`}>
+                Ist: {formatLitres(baseRain.retainedL)}
+              </p>
+            </div>
+            <div className="kpi">
+              <p className="kpi-label">Mittlere Albedo</p>
+              <p className="kpi-value">{formatNumber(albedo, 2)}</p>
+              <p className="kpi-note">Ist: {formatNumber(baseAlbedo, 2)}</p>
+            </div>
+            <div className="kpi">
               <p className="kpi-label">Versiegelt</p>
               <p className="kpi-value">{formatPercent(sealedShare(grid))}</p>
               <p className="kpi-note">Ist: {formatPercent(sealedShare(baseGrid))}</p>
             </div>
           </section>
           <p className="kpi-caption">
-            Mittlere Oberflächentemperatur des Viertels um {formatHour(hour)} Uhr.
+            Temperaturen: Mittel aller Oberflächen um {formatHour(hour)} Uhr. Regenrückhalt: bei{' '}
+            {formatNumber(rainMm, 0)} mm Starkregen auf {formatNumber(areaHectares, 0)} Hektar.
           </p>
 
           <section className="panel map-panel" aria-labelledby="karte">
@@ -198,6 +242,25 @@ export default function App() {
             />
           </section>
 
+          <section className="panel" aria-labelledby="tagesgang">
+            <div>
+              <h2 id="tagesgang">Tagesgang über 24 Stunden</h2>
+              <p className="panel-lead">
+                Mittlere Oberflächentemperatur des Viertels. Versiegelte Flächen speichern die
+                Hitze und bleiben nachts warm, begrünte kühlen schneller ab. Ein Klick ins
+                Diagramm stellt die Uhrzeit des Rasters ein.
+              </p>
+            </div>
+            <DayChart
+              base={baseCurve}
+              improved={curve}
+              hour={hour}
+              onHourChange={setHour}
+              sunrise={sunrise}
+              sunset={sunset}
+            />
+          </section>
+
           <section className="panel" aria-labelledby="pinsel">
             <h2 id="pinsel">Selbst umbauen</h2>
             <BrushPalette
@@ -209,6 +272,13 @@ export default function App() {
           </section>
         </div>
       </main>
+
+      <FormulaDialog
+        open={formulasOpen}
+        onClose={() => setFormulasOpen(false)}
+        weather={liveWeather}
+        hour={hour}
+      />
     </div>
   )
 }

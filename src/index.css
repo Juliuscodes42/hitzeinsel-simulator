@@ -11,6 +11,10 @@
   --linie: #dbe0d8;
   --kuehler: #1c7449;
   --raster-fuge: #1c2420;
+  --reihe-ist: #eb6834;
+  --reihe-soll: #1baf7a;
+  --reihe-luft: #7a827d;
+  --nacht: rgb(40 60 110 / 0.09);
   --radius: 0.75rem;
 
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -32,6 +36,10 @@
     --linie: #2f3933;
     --kuehler: #62c794;
     --raster-fuge: #0a0d0b;
+    --reihe-ist: #d95926;
+    --reihe-soll: #199e70;
+    --reihe-luft: #8e9892;
+    --nacht: rgb(120 150 230 / 0.1);
   }
 }
 
@@ -46,6 +54,7 @@ body {
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
@@ -71,6 +80,10 @@ input {
 
 .app-header {
   margin-bottom: 1.5rem;
+}
+
+.app-header .button {
+  margin-top: 0.75rem;
 }
 
 .kennung {
@@ -411,5 +424,284 @@ h1 {
 .palette-status {
   margin-top: 0.75rem;
   font-size: 0.88rem;
+  color: var(--text-leise);
+}
+
+/* ---------- Diagramm ---------- */
+
+.panel-lead {
+  margin-top: 0.25rem;
+  font-size: 0.88rem;
+  color: var(--text-leise);
+  max-width: 46rem;
+}
+
+.chart {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 1.25rem;
+  height: 0;
+  border-top: 3px solid;
+  border-radius: 2px;
+}
+
+.legend-ist {
+  border-color: var(--reihe-ist);
+}
+
+.legend-soll {
+  border-color: var(--reihe-soll);
+}
+
+.legend-luft {
+  border-top: 2px dashed var(--reihe-luft);
+}
+
+.legend-night {
+  width: 1.25rem;
+  height: 0.8rem;
+  background: var(--nacht);
+  border: 1px solid var(--linie);
+  border-radius: 2px;
+}
+
+.chart-plot {
+  position: relative;
+  min-width: 0;
+}
+
+.panel > *,
+.chart > * {
+  min-width: 0;
+}
+
+.chart-plot {
+  width: 100%;
+  overflow: hidden;
+}
+
+.chart-plot svg {
+  display: block;
+  /* Das SVG darf den Kasten nie breiter machen; die Breite wird per Skript nachgeführt. */
+  max-width: 100%;
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+.chart-night {
+  fill: var(--nacht);
+}
+
+.chart-grid {
+  stroke: var(--linie);
+  stroke-width: 1;
+}
+
+.chart-tick {
+  fill: var(--text-leise);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.line-ist {
+  stroke: var(--reihe-ist);
+}
+
+.line-soll {
+  stroke: var(--reihe-soll);
+}
+
+.line-luft {
+  stroke: var(--reihe-luft);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.chart-now {
+  stroke: var(--text);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.6;
+}
+
+.chart-crosshair {
+  stroke: var(--text-leise);
+  stroke-width: 1;
+}
+
+.chart-dot {
+  stroke: var(--flaeche);
+  stroke-width: 2;
+}
+
+.dot-ist {
+  fill: var(--reihe-ist);
+}
+
+.dot-soll {
+  fill: var(--reihe-soll);
+}
+
+.chart-tooltip {
+  position: absolute;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.chart-tooltip span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-leise);
+}
+
+.chart-tooltip b {
+  margin-left: auto;
+  padding-left: 0.75rem;
+  color: var(--text);
+}
+
+.chart-table summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--akzent);
+}
+
+/* ---------- Tabellen ---------- */
+
+.table-scroll {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  padding: 0.3rem 0.6rem;
+  text-align: right;
+  border-bottom: 1px solid var(--linie);
+  white-space: nowrap;
+}
+
+th:first-child {
+  text-align: left;
+}
+
+thead th {
+  color: var(--text-leise);
+  font-weight: 600;
+}
+
+tbody th {
+  font-weight: 500;
+}
+
+/* ---------- Formel-Fenster ---------- */
+
+.dialog {
+  width: min(48rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  padding: 0;
+  background: var(--flaeche);
+  color: var(--text);
+  border: 1px solid var(--linie);
+  border-radius: var(--radius);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+
+.dialog-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--flaeche);
+  border-bottom: 1px solid var(--linie);
+}
+
+.dialog-head h2 {
+  font-size: 1.15rem;
+}
+
+.dialog-body {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem 1.25rem 1.5rem;
+  font-size: 0.93rem;
+}
+
+.dialog-body h3 {
+  margin-top: 0.75rem;
+  font-size: 1rem;
+}
+
+.dialog-body ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.formula {
+  padding: 0.6rem 0.9rem;
+  background: var(--flaeche-leise);
+  border-radius: 0.5rem;
+  font-family: 'Cambria Math', Cambria, Georgia, serif;
+  font-size: 1.05rem;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.note {
+  font-size: 0.82rem;
   color: var(--text-leise);
 }

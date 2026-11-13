@@ -55,6 +55,17 @@ export function sinSolarElevation(latitudeDeg: number, dayOfYear: number, hour: 
 }
 
 /**
+ * Uhrzeiten von Sonnenauf- und -untergang (wahre Sonnenzeit).
+ *   cos ω₀ = −tan φ · tan δ   → halbe Tageslänge ω₀ in Grad, 15° = 1 Stunde
+ */
+export function daylight(weather: Weather): { sunrise: number; sunset: number } {
+  const declination = toRadians(23.44) * Math.sin((2 * Math.PI * (284 + weather.dayOfYear)) / 365)
+  const cosHalfDay = -Math.tan(toRadians(weather.latitudeDeg)) * Math.tan(declination)
+  const halfDayHours = (Math.acos(Math.min(1, Math.max(-1, cosHalfDay))) * 12) / Math.PI
+  return { sunrise: 12 - halfDayHours, sunset: 12 + halfDayHours }
+}
+
+/**
  * Sonnenstrahlung auf eine waagerechte Fläche in W/m².
  *   K↓ = S₀ · τ · sin h
  */

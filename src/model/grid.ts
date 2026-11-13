@@ -137,6 +137,29 @@ export function meanSurfaceTempAt(result: GridResult, hour: number): number {
   return average(result.cells.map((cell) => surfaceTempAt(cell, hour)))
 }
 
+/** Ein Punkt der Tageskurve des ganzen Viertels. */
+export interface CurvePoint {
+  hour: number
+  /** Mittlere Oberflächentemperatur aller Zellen in °C. */
+  surfaceC: number
+  airC: number
+}
+
+/** Tagesgang der mittleren Oberflächentemperatur, ein Punkt alle 10 Minuten. */
+export function meanDailyCurve(result: GridResult): CurvePoint[] {
+  const first = result.cells[0].samples
+  return first.map((sample, i) => ({
+    hour: sample.hour,
+    surfaceC: average(result.cells.map((cell) => cell.samples[i].surfaceC)),
+    airC: sample.airC,
+  }))
+}
+
+/** Flächengemittelte Albedo des Rasters (0–1). */
+export function meanAlbedo(grid: CityGrid): number {
+  return average(grid.cells.map((cell) => MATERIALS[cell.surface].albedo))
+}
+
 export function summarize(grid: CityGrid, result: GridResult): GridSummary {
   return {
     meanAfternoonC: average(result.cells.map((cell) => surfaceTempAt(cell, 15))),

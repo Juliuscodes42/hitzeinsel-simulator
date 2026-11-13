@@ -27,7 +27,7 @@ deaktiviert sind, stattdessen `npm.cmd test` bzw. `npm.cmd run dev` verwenden.
 1. Projektgerüst und Veröffentlichung ✓
 2. Physik-Modell (dynamische Energiebilanz) mit Tests ✓
 3. Interaktives 20×20-Raster mit Reglern und Maßnahmen ✓
-4. 24-Stunden-Diagramm, Kennzahlen, Formel-Fenster
+4. 24-Stunden-Diagramm, Kennzahlen, Formel-Fenster ✓
 5. Echte Orte: Luftbild, OpenStreetMap, eigene Drohnenbilder
 6. Aktuelles Wetter als Startwerte
 7. Optimierer für Maßnahmen
