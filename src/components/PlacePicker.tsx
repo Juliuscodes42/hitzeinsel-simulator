@@ -7,20 +7,11 @@ import {
   aerialImageUrl,
   fetchOsm,
   searchPlaces,
+  type Place,
   type PlaceHit,
 } from '../data/places.ts'
-import type { CityGrid } from '../model/grid.ts'
+import { EXAMPLE_PLACES, type ExamplePlace } from '../data/examplePlaces.ts'
 import { rasterizeOsm, squareAround, type BBox } from '../model/osm.ts'
-
-/** Ein aus echten Daten geladener Ausschnitt. */
-export interface Place {
-  name: string
-  bbox: BBox
-  grid: CityGrid
-  /** Anteil der Zellen, deren Oberfläche nur geschätzt ist (0–1). */
-  guessedShare: number
-  imageUrl: string
-}
 
 interface PlacePickerProps {
   onLoaded: (place: Place) => void
@@ -95,6 +86,14 @@ export function PlacePicker({ onLoaded }: PlacePickerProps) {
     setStatus({ kind: 'idle', text: 'Rahmen bei Bedarf verschieben, dann „Ausschnitt laden".' })
   }
 
+  const loadExample = (example: ExamplePlace) => {
+    map.current?.setView([example.lat, example.lon], 18)
+    setPlaceName(example.name)
+    setHits([])
+    onLoaded(example)
+    setStatus({ kind: 'idle', text: `Beispielort „${example.name}" geladen.` })
+  }
+
   const handleLoad = async () => {
     const center = map.current?.getCenter()
     if (!center) return
@@ -120,6 +119,15 @@ export function PlacePicker({ onLoaded }: PlacePickerProps) {
 
   return (
     <div className="place-picker">
+      <div className="place-examples">
+        <span>Beispielorte (auch ohne Internet):</span>
+        {EXAMPLE_PLACES.map((example) => (
+          <button key={example.id} type="button" className="button" onClick={() => loadExample(example)}>
+            {example.name}
+          </button>
+        ))}
+      </div>
+
       <form className="place-search" onSubmit={handleSearch} role="search">
         <label htmlFor="ortssuche" className="sr-only">
           Ort oder Adresse in Deutschland

@@ -5,7 +5,19 @@
  * aber Nutzungsregeln: Wir fragen nur auf Knopfdruck an, nie automatisch.
  */
 
+import type { CityGrid } from '../model/grid.ts'
 import type { BBox, OsmElement } from '../model/osm.ts'
+
+/** Ein aus echten Daten geladener Ausschnitt. */
+export interface Place {
+  name: string
+  bbox: BBox
+  grid: CityGrid
+  /** Anteil der Zellen, deren Oberfläche nur geschätzt ist (0–1). */
+  guessedShare: number
+  /** Adresse des Luftbilds für genau diesen Ausschnitt. */
+  imageUrl: string
+}
 
 /* ---------- Ortssuche (Nominatim, OpenStreetMap) ---------- */
 

@@ -100,7 +100,10 @@ export function CityGridView({
     <div className="city-grid-wrap">
       {background && (
         <img
+          key={background.url}
           className="city-grid-bg"
+          // Ohne Internet fehlt das Luftbild: dann einfach ausblenden.
+          onError={(event) => (event.currentTarget.style.visibility = 'hidden')}
           src={background.url}
           alt=""
           draggable={false}

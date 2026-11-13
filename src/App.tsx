@@ -24,11 +24,12 @@ import {
 } from './components/format.ts'
 import { FormulaDialog } from './components/FormulaDialog.tsx'
 import { OptimizerPanel } from './components/OptimizerPanel.tsx'
-import { PlacePicker, type Place } from './components/PlacePicker.tsx'
+import { PlacePicker } from './components/PlacePicker.tsx'
 import { Slider } from './components/Slider.tsx'
 import { TemperatureLegend } from './components/TemperatureLegend.tsx'
+import { ValidationPanel } from './components/ValidationPanel.tsx'
 import { MATERIALS } from './data/materials.ts'
-import { IMAGERY_ATTRIBUTION, OSM_ATTRIBUTION } from './data/places.ts'
+import { IMAGERY_ATTRIBUTION, OSM_ATTRIBUTION, type Place } from './data/places.ts'
 import { DEFAULT_WEATHER, airTemperatureC, daylight } from './model/atmosphere.ts'
 import {
   NO_MEASURES,
@@ -384,6 +385,17 @@ export default function App() {
               paintedCount={overrides.size}
               onClear={() => setOverrides(NO_OVERRIDES)}
             />
+          </section>
+
+          <section className="panel" aria-labelledby="pruefung">
+            <div>
+              <h2 id="pruefung">Vergleich mit Satellitenmessungen</h2>
+              <p className="panel-lead">
+                Stimmt das Modell? An den Beispielorten wird es mit Oberflächentemperaturen
+                verglichen, die der Satellit Landsat an heißen Sommertagen gemessen hat.
+              </p>
+            </div>
+            <ValidationPanel />
           </section>
         </div>
       </main>

@@ -21,6 +21,8 @@ deaktiviert sind, stattdessen `npm.cmd test` bzw. `npm.cmd run dev` verwenden.
 | `src/components` | Bausteine der Oberfläche |
 | `src/data` | Materialwerte mit Quellen, Beispielorte |
 | `docs/expertenfragen` | Fragen an Fachleute, E-Mail-Vorlage, Antworten |
+| `docs/quellen.md` | Quellenliste für Formeln und Daten |
+| `scripts/build-places.ts` | Erzeugt die Beispielorte samt Landsat-Messwerten neu (`node scripts/build-places.ts`) |
 
 ## Fahrplan
 
@@ -31,5 +33,5 @@ deaktiviert sind, stattdessen `npm.cmd test` bzw. `npm.cmd run dev` verwenden.
 5. Echte Orte: Luftbild, OpenStreetMap, eigene Drohnenbilder ✓
 6. Aktuelles Wetter als Startwerte ✓
 7. Optimierer für Maßnahmen ✓
-8. Vergleich mit Satelliten-Oberflächentemperaturen, Offline-Beispielorte
+8. Vergleich mit Satelliten-Oberflächentemperaturen, Offline-Beispielorte ✓
 9. Optional: KI-Erklärtext
