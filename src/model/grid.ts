@@ -132,6 +132,11 @@ export interface GridSummary {
 const average = (values: number[]): number =>
   values.reduce((sum, value) => sum + value, 0) / values.length
 
+/** Mittlere Oberflächentemperatur aller Zellen zu einer Uhrzeit in °C. */
+export function meanSurfaceTempAt(result: GridResult, hour: number): number {
+  return average(result.cells.map((cell) => surfaceTempAt(cell, hour)))
+}
+
 export function summarize(grid: CityGrid, result: GridResult): GridSummary {
   return {
     meanAfternoonC: average(result.cells.map((cell) => surfaceTempAt(cell, 15))),

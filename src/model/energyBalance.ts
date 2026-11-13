@@ -126,6 +126,99 @@ export function heatStorageOf(material: Material): { capacity: number; coupling:
   }
 }
 
+/** Äußere Bedingungen zu einem Zeitpunkt. */
+interface Forcing {
+  airC: number
+  /** Sonnenstrahlung K↓ in W/m². */
+  shortwave: number
+  /** Gegenstrahlung der Atmosphäre L↓ in W/m². */
+  longwave: number
+  /** Dampfdruck der Luft in Pa. */
+  vapourPressure: number
+}
+
+function forcingAt(weather: Weather, hour: number, vapourPressure: number): Forcing {
+  const airC = airTemperatureC(weather, hour)
+  return {
+    airC,
+    shortwave: shortwaveDown(weather, hour),
+    longwave: longwaveDown(airC),
+    vapourPressure,
+  }
+}
+
+/**
+ * Die äußeren Bedingungen für jeden Rechenschritt eines Tages. Sie hängen
+ * nur vom Wetter ab und werden deshalb je Wetter nur einmal berechnet und
+ * dann für alle Zellen wiederverwendet.
+ */
+const forcingCache = new WeakMap<Weather, Forcing[]>()
+
+function dailyForcing(weather: Weather): Forcing[] {
+  let table = forcingCache.get(weather)
+  if (!table) {
+    const vapourPressure = airVapourPressure(weather)
+    table = Array.from({ length: STEPS_PER_DAY }, (_, step) =>
+      forcingAt(weather, (step * TIME_STEP) / 3600, vapourPressure),
+    )
+    forcingCache.set(weather, table)
+  }
+  return table
+}
+
+/** Die eigentliche Energiebilanz: alle Flüsse aus Material, Lage und äußeren Bedingungen. */
+function fluxesFor(
+  material: Material,
+  coupling: number,
+  conditions: CellConditions,
+  h: number,
+  forcing: Forcing,
+  hour: number,
+  surfaceC: number,
+  deepC: number,
+): Fluxes {
+  // Strahlung: aufgenommenes Sonnenlicht und Bilanz der Wärmestrahlung.
+  const shortwaveAbsorbed = (1 - material.albedo) * (1 - conditions.shade) * forcing.shortwave
+  const emitted = STEFAN_BOLTZMANN * celsiusToKelvin(surfaceC) ** 4
+  const longwaveNet =
+    material.emissivity * conditions.skyViewFactor * (forcing.longwave - emitted)
+
+  // Konvektion: Wärmeabgabe an die Luft.
+  const sensible = h * (surfaceC - forcing.airC)
+
+  // Verdunstung: nur wenn Wasser verfügbar ist und die Luft noch Dampf aufnimmt.
+  const misting = conditions.mist && hour >= MIST_START_HOUR && hour < MIST_END_HOUR
+  const moisture = misting
+    ? Math.max(material.moistureAvailability, MIST_MOISTURE)
+    : material.moistureAvailability
+  const latent =
+    moisture === 0
+      ? 0
+      : moisture *
+        (h / PSYCHROMETRIC_CONSTANT) *
+        Math.max(0, saturationVapourPressure(surfaceC) - forcing.vapourPressure)
+
+  // Wärmeleitung in tiefere Schichten bzw. ins Gebäude.
+  const ground = coupling * (surfaceC - deepC)
+
+  return {
+    shortwaveAbsorbed,
+    longwaveNet,
+    netRadiation: shortwaveAbsorbed + longwaveNet,
+    sensible,
+    latent,
+    ground,
+  }
+}
+
+/** Wärmeübergangskoeffizient einer Zelle, mit Windabschwächung und Blattflächen-Faktor. */
+function exchangeCoefficient(material: Material, conditions: CellConditions, weather: Weather) {
+  return (
+    (material.exchangeFactor ?? 1) *
+    convectionCoefficient(weather.windSpeed * conditions.windFactor)
+  )
+}
+
 /**
  * Berechnet alle Energieflüsse einer Oberfläche zu einem Zeitpunkt.
  *
@@ -140,40 +233,16 @@ export function computeFluxes(
   deepC: number,
 ): Fluxes {
   const material = MATERIALS[conditions.surface]
-  const airC = airTemperatureC(weather, hour)
-
-  // Strahlung: aufgenommenes Sonnenlicht und Bilanz der Wärmestrahlung.
-  const shortwaveAbsorbed =
-    (1 - material.albedo) * (1 - conditions.shade) * shortwaveDown(weather, hour)
-  const emitted = STEFAN_BOLTZMANN * celsiusToKelvin(surfaceC) ** 4
-  const longwaveNet =
-    material.emissivity * conditions.skyViewFactor * (longwaveDown(airC) - emitted)
-
-  // Konvektion: Wärmeabgabe an die Luft.
-  const h =
-    (material.exchangeFactor ?? 1) *
-    convectionCoefficient(weather.windSpeed * conditions.windFactor)
-  const sensible = h * (surfaceC - airC)
-
-  // Verdunstung: nur wenn Wasser verfügbar ist und die Luft noch Dampf aufnimmt.
-  const misting = conditions.mist && hour >= MIST_START_HOUR && hour < MIST_END_HOUR
-  const moisture = misting
-    ? Math.max(material.moistureAvailability, MIST_MOISTURE)
-    : material.moistureAvailability
-  const vapourDeficit = saturationVapourPressure(surfaceC) - airVapourPressure(weather)
-  const latent = moisture * (h / PSYCHROMETRIC_CONSTANT) * Math.max(0, vapourDeficit)
-
-  // Wärmeleitung in tiefere Schichten bzw. ins Gebäude.
-  const ground = heatStorageOf(material).coupling * (surfaceC - deepC)
-
-  return {
-    shortwaveAbsorbed,
-    longwaveNet,
-    netRadiation: shortwaveAbsorbed + longwaveNet,
-    sensible,
-    latent,
-    ground,
-  }
+  return fluxesFor(
+    material,
+    heatStorageOf(material).coupling,
+    conditions,
+    exchangeCoefficient(material, conditions, weather),
+    forcingAt(weather, hour, airVapourPressure(weather)),
+    hour,
+    surfaceC,
+    deepC,
+  )
 }
 
 /**
@@ -186,10 +255,12 @@ export function computeFluxes(
  */
 export function simulateDay(conditions: CellConditions, weather: Weather): DayResult {
   const material = MATERIALS[conditions.surface]
-  const { capacity } = heatStorageOf(material)
+  const { capacity, coupling } = heatStorageOf(material)
+  const h = exchangeCoefficient(material, conditions, weather)
+  const forcing = dailyForcing(weather)
   const fixedDeepC = material.storage.kind === 'layer' ? material.storage.deepTempC : undefined
 
-  let surfaceC = airTemperatureC(weather, 0)
+  let surfaceC = forcing[0].airC
   let deepC = fixedDeepC ?? meanAirTemperatureC(weather)
   let samples: Sample[] = []
   let maxC = -Infinity
@@ -205,14 +276,16 @@ export function simulateDay(conditions: CellConditions, weather: Weather): DayRe
 
     for (let step = 0; step < STEPS_PER_DAY; step++) {
       const hour = (step * TIME_STEP) / 3600
-      const fluxes = computeFluxes(conditions, weather, hour, surfaceC, deepC)
+      const fluxes = fluxesFor(
+        material, coupling, conditions, h, forcing[step], hour, surfaceC, deepC,
+      )
 
       if (isLastDay && step % SAMPLE_EVERY === 0) {
-        samples.push({ hour, surfaceC, airC: airTemperatureC(weather, hour), fluxes })
+        samples.push({ hour, surfaceC, airC: forcing[step].airC, fluxes })
       }
       sum += surfaceC
-      maxC = Math.max(maxC, surfaceC)
-      minC = Math.min(minC, surfaceC)
+      if (surfaceC > maxC) maxC = surfaceC
+      if (surfaceC < minC) minC = surfaceC
 
       // Explizites Euler-Verfahren: Temperaturänderung = Energieüberschuss / C.
       const surplus = fluxes.netRadiation - fluxes.sensible - fluxes.latent - fluxes.ground
