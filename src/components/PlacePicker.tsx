@@ -15,6 +15,8 @@ import { rasterizeOsm, squareAround, type BBox } from '../model/osm.ts'
 
 interface PlacePickerProps {
   onLoaded: (place: Place) => void
+  /** Erfundenes Beispielviertel statt eines echten Orts verwenden. */
+  onDistrict: () => void
 }
 
 /** Kantenlänge des Ausschnitts in Metern (20 Zellen à 10 m). */
@@ -31,9 +33,11 @@ const toBounds = (bbox: BBox): L.LatLngBoundsExpression => [
  * Ort suchen, Ausschnitt auf dem Luftbild wählen und als Raster laden.
  * Der gelbe Rahmen in der Kartenmitte zeigt die 200 m × 200 m, die geladen werden.
  */
-export function PlacePicker({ onLoaded }: PlacePickerProps) {
+export function PlacePicker({ onLoaded, onDistrict }: PlacePickerProps) {
   const mapElement = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
+  // Die Karte wird erst angelegt, wenn die Suche aufgeklappt ist.
+  const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<PlaceHit[]>([])
   const [placeName, setPlaceName] = useState('')
@@ -43,7 +47,7 @@ export function PlacePicker({ onLoaded }: PlacePickerProps) {
   })
 
   useEffect(() => {
-    if (!mapElement.current) return
+    if (!searchOpen || !mapElement.current) return
     const instance = L.map(mapElement.current, { center: START, zoom: 17, maxZoom: 19 })
     L.tileLayer(IMAGERY_TILE_URL, { maxZoom: 19, attribution: IMAGERY_ATTRIBUTION }).addTo(instance)
 
@@ -61,7 +65,7 @@ export function PlacePicker({ onLoaded }: PlacePickerProps) {
       instance.remove()
       map.current = null
     }
-  }, [])
+  }, [searchOpen])
 
   const handleSearch = async (event: FormEvent) => {
     event.preventDefault()
@@ -111,7 +115,7 @@ export function PlacePicker({ onLoaded }: PlacePickerProps) {
         guessedShare,
         imageUrl: aerialImageUrl(bbox),
       })
-      setStatus({ kind: 'idle', text: 'Ausschnitt geladen. Das Raster darunter zeigt jetzt diesen Ort.' })
+      setStatus({ kind: 'idle', text: 'Ausschnitt geladen.' })
     } catch (error) {
       setStatus({ kind: 'error', text: String(error instanceof Error ? error.message : error) })
     }
@@ -119,58 +123,103 @@ export function PlacePicker({ onLoaded }: PlacePickerProps) {
 
   return (
     <div className="place-picker">
-      <div className="place-examples">
-        <span>Beispielorte (auch ohne Internet):</span>
-        {EXAMPLE_PLACES.map((example) => (
-          <button key={example.id} type="button" className="button" onClick={() => loadExample(example)}>
-            {example.name}
-          </button>
-        ))}
-      </div>
-
-      <form className="place-search" onSubmit={handleSearch} role="search">
-        <label htmlFor="ortssuche" className="sr-only">
-          Ort oder Adresse in Deutschland
-        </label>
-        <input
-          id="ortssuche"
-          type="search"
-          value={query}
-          placeholder="Ort oder Adresse, z. B. Schulstraße Elmshorn"
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <button type="submit" className="button" disabled={status.kind === 'busy'}>
-          Suchen
-        </button>
-      </form>
-
-      {hits.length > 1 && (
-        <ul className="place-hits">
-          {hits.map((hit) => (
-            <li key={`${hit.lat},${hit.lon}`}>
-              <button type="button" className="link-button" onClick={() => goTo(hit)}>
-                {hit.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div ref={mapElement} className="place-map" aria-label="Luftbild-Karte zur Auswahl des Ausschnitts" />
-
-      <div className="place-actions">
-        <button
-          type="button"
-          className="button button-primary"
-          onClick={handleLoad}
-          disabled={status.kind === 'busy'}
-        >
-          Ausschnitt laden
-        </button>
-        <p className={`place-status${status.kind === 'error' ? ' is-error' : ''}`} role="status">
-          {status.text}
+      <section className="choice" aria-labelledby="wahl-beispiel">
+        <h3 id="wahl-beispiel">Beispielort nehmen</h3>
+        <p className="slider-hint">
+          Vier vorbereitete Orte mit Luftbild und Satellitenmessung. Sie laden sofort und auch
+          ohne Internet.
         </p>
-      </div>
+        <div className="choice-cards">
+          {EXAMPLE_PLACES.map((example) => (
+            <button
+              key={example.id}
+              type="button"
+              className="choice-card"
+              onClick={() => loadExample(example)}
+            >
+              {example.name}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <details
+        className="fold"
+        onToggle={(event) => setSearchOpen(event.currentTarget.open)}
+      >
+        <summary>
+          <span className="fold-title">Eigenen Ort in Deutschland suchen</span>
+          <span className="fold-note">Schule, Parkplatz, Straße …</span>
+        </summary>
+        <div className="fold-body">
+          <p className="slider-hint">
+            Der gelbe Rahmen zeigt 200 m × 200 m. Gebäude, Straßen, Parkplätze und Grünflächen
+            kommen aus OpenStreetMap.
+          </p>
+          <form className="place-search" onSubmit={handleSearch} role="search">
+            <label htmlFor="ortssuche" className="sr-only">
+              Ort oder Adresse in Deutschland
+            </label>
+            <input
+              id="ortssuche"
+              type="search"
+              value={query}
+              placeholder="Ort oder Adresse, z. B. Schulstraße Elmshorn"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <button type="submit" className="button" disabled={status.kind === 'busy'}>
+              Suchen
+            </button>
+          </form>
+
+          {hits.length > 1 && (
+            <ul className="place-hits">
+              {hits.map((hit) => (
+                <li key={`${hit.lat},${hit.lon}`}>
+                  <button type="button" className="link-button" onClick={() => goTo(hit)}>
+                    {hit.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {searchOpen && (
+            <div
+              ref={mapElement}
+              className="place-map"
+              aria-label="Luftbild-Karte zur Auswahl des Ausschnitts"
+            />
+          )}
+
+          <div className="place-actions">
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={handleLoad}
+              disabled={status.kind === 'busy'}
+            >
+              Ausschnitt laden
+            </button>
+            <p className={`place-status${status.kind === 'error' ? ' is-error' : ''}`} role="status">
+              {status.text}
+            </p>
+          </div>
+        </div>
+      </details>
+
+      <section className="choice" aria-labelledby="wahl-viertel">
+        <h3 id="wahl-viertel">Ohne echten Ort ausprobieren</h3>
+        <p className="slider-hint">
+          Ein erfundenes Viertel, bei dem sich Versiegelung und Bebauungsdichte frei einstellen
+          lassen.
+        </p>
+        <div>
+          <button type="button" className="button" onClick={onDistrict}>
+            Erfundenes Beispielviertel nehmen
+          </button>
+        </div>
+      </section>
     </div>
   )
 }

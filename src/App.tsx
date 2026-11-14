@@ -2,6 +2,11 @@
  * Wurzel-Komponente: hält den Zustand der App und verbindet Regler,
  * Modell und Darstellung.
  *
+ * Die Seite führt in vier Schritten durch die Arbeit:
+ *   1 Ort wählen → 2 Ausgangslage prüfen → 3 Maßnahmen wählen → 4 Ergebnis
+ * Ab Schritt 2 steht links das Raster, rechts der Inhalt des Schritts.
+ * Seltener gebrauchte Einstellungen sind aufklappbar (Fold).
+ *
  * Datenfluss:
  *   Regler → Ausgangsviertel (Ist) → + Maßnahmen + gemalte Zellen (Soll)
  *          → Simulation beider Raster → Raster-Ansicht und Kennzahlen
@@ -12,9 +17,10 @@ import { DEFAULT_ALIGNMENT } from './components/alignment.ts'
 import { BackgroundControls } from './components/BackgroundControls.tsx'
 import { BrushPalette, type Brush } from './components/BrushPalette.tsx'
 import { CityGridView, type ViewMode } from './components/CityGridView.tsx'
-import { ControlPanel, type GridSource } from './components/ControlPanel.tsx'
 import { CorrectionControls } from './components/CorrectionControls.tsx'
 import { DayChart } from './components/DayChart.tsx'
+import { DistrictControls } from './components/DistrictControls.tsx'
+import { Fold } from './components/Fold.tsx'
 import {
   formatDelta,
   formatHour,
@@ -24,11 +30,16 @@ import {
   formatTemp,
 } from './components/format.ts'
 import { FormulaDialog } from './components/FormulaDialog.tsx'
+import { MeasureControls } from './components/MeasureControls.tsx'
 import { OptimizerPanel } from './components/OptimizerPanel.tsx'
 import { PlacePicker } from './components/PlacePicker.tsx'
 import { Slider } from './components/Slider.tsx'
+import { Stepper } from './components/Stepper.tsx'
+import { STEPS } from './components/steps.ts'
+import { SurfaceLegend } from './components/SurfaceLegend.tsx'
 import { TemperatureLegend } from './components/TemperatureLegend.tsx'
 import { ValidationPanel } from './components/ValidationPanel.tsx'
+import { WeatherControls } from './components/WeatherControls.tsx'
 import {
   applyCorrection,
   correctionFromGrid,
@@ -62,7 +73,28 @@ import { rainBalance } from './model/water.ts'
 const DEFAULT_DISTRICT: DistrictParams = { sealing: 0.75, density: 0.35, seed: 7 }
 const NO_OVERRIDES: ReadonlyMap<number, GridCell> = new Map()
 
+/** Woher das Raster kommt: erzeugtes Beispielviertel oder echter Ort. */
+type GridSource = 'example' | 'place'
+
+/** Überschrift und Erklärung der Schritte 2 bis 4. */
+const STEP_TEXT = [
+  null,
+  {
+    title: 'Ausgangslage prüfen',
+    lead: 'So sieht das Modell den Ort heute, ohne Umbauten. Passt das Raster zum Luftbild? Dann geht es weiter.',
+  },
+  {
+    title: 'Maßnahmen wählen',
+    lead: 'Drei Wege zum kühleren Viertel. Sie lassen sich auch nacheinander nutzen.',
+  },
+  {
+    title: 'Ergebnis ansehen',
+    lead: 'Der Vergleich von heute (Ist) und nach dem Umbau (Soll).',
+  },
+] as const
+
 export default function App() {
+  const [step, setStep] = useState(0)
   const [weather, setWeather] = useState(DEFAULT_WEATHER)
   const [district, setDistrict] = useState(DEFAULT_DISTRICT)
   const [measures, setMeasures] = useState(NO_MEASURES)
@@ -179,291 +211,462 @@ export default function App() {
   const albedo = meanAlbedo(grid)
   const areaHectares = (grid.cells.length * grid.cellSizeM ** 2) / 10_000
 
+  const anyMeasure = Object.values(measures).some((share) => share > 0)
+  const anyChange = anyMeasure || overrides.size > 0
+  const cooler = mean < baseMean - 0.05
+
+  /** Wechselt den Schritt und stellt die dazu passende Ansicht des Rasters ein. */
+  const goTo = (next: number, hasImage = background !== null) => {
+    setStep(next)
+    setBrush(null)
+    // Ausgangslage: erkannte Flächen. Maßnahmen: Umbauten auf dem Luftbild. Ergebnis: Temperatur.
+    if (next === 1) setView('surface')
+    if (next === 2) setView(hasImage ? 'aerial' : 'temperature')
+    if (next === 3) setView('temperature')
+    window.scrollTo({ top: 0 })
+  }
+
+  const stepText = STEP_TEXT[step]
+
   return (
     <div className="app">
       <header className="app-header">
-        <p className="kennung">Jugend forscht 2027</p>
-        <h1>Hitzeinsel-Simulator</h1>
-        <p className="untertitel">
-          Wie heiß wird ein Stadtviertel, und was bringen Bäume, Gründächer und entsiegelte
-          Flächen?
-        </p>
+        <div>
+          <p className="kennung">Jugend forscht 2027</p>
+          <h1>Hitzeinsel-Simulator</h1>
+          <p className="untertitel">
+            Wie heiß wird ein Stadtviertel, und was bringen Bäume, Gründächer und entsiegelte
+            Flächen?
+          </p>
+        </div>
         <button type="button" className="button" onClick={() => setFormulasOpen(true)}>
           Formeln und Annahmen
         </button>
       </header>
 
-      <main className="layout">
-        <ControlPanel
-          weather={weather}
-          onWeatherChange={setWeather}
-          weatherLocation={weatherLocation}
-          weatherLabel={weatherLabel}
-          onWeatherLoaded={(loaded, label) => {
-            setWeather(loaded)
-            setWeatherLabel(label)
-          }}
-          onWeatherReset={() => {
-            setWeather(DEFAULT_WEATHER)
-            setWeatherLabel(null)
-          }}
-          rainMm={rainMm}
-          onRainChange={setRainMm}
-          mode={mode}
-          onModeChange={(next) => {
-            if (next !== mode) setOverrides(NO_OVERRIDES)
-            setMode(next)
-          }}
-          placeSummary={
-            place
-              ? `${place.name}. Flächen aus OpenStreetMap, ${formatPercent(place.guessedShare)} der Zellen sind geschätzt und sollten geprüft werden.`
-              : null
-          }
-          district={district}
-          onDistrictChange={(next) => {
-            // Ein neu gewürfeltes Viertel passt nicht mehr zu den gemalten Zellen.
-            if (next.seed !== district.seed) setOverrides(NO_OVERRIDES)
-            setDistrict(next)
-          }}
-          measures={measures}
-          onMeasuresChange={setMeasures}
-          onResetMeasures={() => setMeasures(NO_MEASURES)}
-        />
+      <Stepper step={step} onStep={(next) => goTo(next)} />
 
-        <div className="stage">
-          {mode === 'place' && (
-            <section className="panel" aria-labelledby="ort">
-              <div>
-                <h2 id="ort">Ort wählen</h2>
-                <p className="panel-lead">
-                  Der gelbe Rahmen zeigt 200 m × 200 m. Gebäude, Straßen, Parkplätze und
-                  Grünflächen kommen aus OpenStreetMap. Was dort fehlt, lässt sich unten mit dem
-                  Pinsel nachtragen.
-                </p>
-              </div>
-              <PlacePicker
-                onLoaded={(loaded) => {
-                  setPlace(loaded)
+      <main>
+        {step === 0 && (
+          <section className="panel step-panel step-start" aria-labelledby="schritt-titel">
+            <div>
+              <p className="step-count">Schritt 1 von {STEPS.length}</p>
+              <h2 id="schritt-titel">Welchen Ort möchtest du untersuchen?</h2>
+              <p className="panel-lead">
+                Untersucht wird ein Ausschnitt von 200 m × 200 m. Danach prüfst du die
+                Ausgangslage, wählst Maßnahmen und siehst, wie viel kühler es wird.
+              </p>
+            </div>
+            <PlacePicker
+              onLoaded={(loaded) => {
+                setPlace(loaded)
+                setMode('place')
+                setOverrides(NO_OVERRIDES)
+                setMeasures(NO_MEASURES)
+                setCustomImage(null)
+                goTo(1, true)
+              }}
+              onDistrict={() => {
+                if (mode !== 'example') {
                   setOverrides(NO_OVERRIDES)
-                  setView('aerial')
-                }}
-              />
-              {activePlace && activeKey && (
-                <CorrectionControls
-                  placeKey={activeKey}
-                  corrections={corrections}
-                  hasUnsavedChanges={overrides.size > 0}
-                  onSave={() =>
-                    updateCorrections({
-                      ...corrections,
-                      // Gespeichert wird das Raster ohne Regler-Maßnahmen, nur mit gemalten Zellen.
-                      [activeKey]: correctionFromGrid(
-                        applyOverrides(baseGrid, overrides),
-                        new Date().toISOString().slice(0, 10),
-                      ),
-                    })
-                  }
-                  onRestoreOriginal={() => {
-                    const { [activeKey]: _removed, ...rest } = corrections
-                    updateCorrections(rest)
-                  }}
-                  onImport={(imported) => updateCorrections({ ...corrections, ...imported })}
-                />
-              )}
-            </section>
-          )}
-
-          <section className="kpis" aria-label="Kennzahlen">
-            <div className="kpi">
-              <p className="kpi-label">Ohne Maßnahmen (Ist)</p>
-              <p className="kpi-value">{formatTemp(baseMean)}</p>
-            </div>
-            <div className="kpi">
-              <p className="kpi-label">Mit Maßnahmen (Soll)</p>
-              <p className="kpi-value">{formatTemp(mean)}</p>
-              <p className={`kpi-note${mean < baseMean - 0.05 ? ' is-cooler' : ''}`}>
-                {formatDelta(mean - baseMean)}
-              </p>
-            </div>
-            <div className="kpi">
-              <p className="kpi-label">Heißeste Fläche</p>
-              <p className="kpi-value">{formatTemp(hottest)}</p>
-              <p className="kpi-note">Luft: {formatTemp(airTemperatureC(liveWeather, hour))}</p>
-            </div>
-            <div className="kpi">
-              <p className="kpi-label">Regenrückhalt</p>
-              <p className="kpi-value">{formatLitres(rain.retainedL)}</p>
-              <p className={`kpi-note${rain.retainedL > baseRain.retainedL + 1 ? ' is-cooler' : ''}`}>
-                Ist: {formatLitres(baseRain.retainedL)}
-              </p>
-            </div>
-            <div className="kpi">
-              <p className="kpi-label">Mittlere Albedo</p>
-              <p className="kpi-value">{formatNumber(albedo, 2)}</p>
-              <p className="kpi-note">Ist: {formatNumber(baseAlbedo, 2)}</p>
-            </div>
-            <div className="kpi">
-              <p className="kpi-label">Versiegelt</p>
-              <p className="kpi-value">{formatPercent(sealedShare(grid))}</p>
-              <p className="kpi-note">Ist: {formatPercent(sealedShare(baseGrid))}</p>
-            </div>
+                  setMeasures(NO_MEASURES)
+                }
+                setMode('example')
+                goTo(1, customImage !== null)
+              }}
+            />
           </section>
-          <p className="kpi-caption">
-            Temperaturen: Mittel aller Oberflächen um {formatHour(hour)} Uhr. Regenrückhalt: bei{' '}
-            {formatNumber(rainMm, 0)} mm Starkregen auf {formatNumber(areaHectares, 0)} Hektar.
-          </p>
+        )}
 
-          <section className="panel map-panel" aria-labelledby="karte">
-            <div className="panel-head">
-              <h2 id="karte">Stadtraster</h2>
-              <div className="toggle" role="group" aria-label="Ansicht">
-                {background && (
+        {step > 0 && stepText && (
+          <div className="workspace">
+            <section className="panel map-panel" aria-labelledby="karte">
+              <div className="panel-head">
+                <h2 id="karte">
+                  {activePlace ? activePlace.name.split(',')[0] : 'Erfundenes Beispielviertel'}
+                </h2>
+                <div className="toggle" role="group" aria-label="Ansicht">
+                  {background && (
+                    <button
+                      type="button"
+                      aria-pressed={shownView === 'aerial'}
+                      onClick={() => setView('aerial')}
+                    >
+                      Luftbild
+                    </button>
+                  )}
                   <button
                     type="button"
-                    aria-pressed={shownView === 'aerial'}
-                    onClick={() => setView('aerial')}
+                    aria-pressed={shownView === 'surface'}
+                    onClick={() => setView('surface')}
                   >
-                    Luftbild
+                    Flächen
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={shownView === 'temperature'}
+                    onClick={() => setView('temperature')}
+                  >
+                    Temperatur
+                  </button>
+                </div>
+              </div>
+
+              <CityGridView
+                grid={grid}
+                result={result}
+                hour={hour}
+                view={shownView}
+                baseCells={baseGrid.cells}
+                background={background}
+                cellOpacity={cellOpacity}
+                painting={brush !== null}
+                onPaint={paint}
+                onInspect={setInspected}
+              />
+
+              <p className="inspect" aria-live="polite">
+                {inspected !== null && inspectedCell
+                  ? `${MATERIALS[inspectedCell.surface].label}${
+                      inspectedCell.mist ? ' mit Sprühnebel' : ''
+                    }: ${formatTemp(surfaceTempAt(result.cells[inspected], hour))} um ${formatHour(
+                      hour,
+                    )} Uhr, Tageshöchstwert ${formatTemp(result.cells[inspected].maxC)}`
+                  : 'Zelle berühren, um Werte zu sehen. Eine Zelle ist 10 m × 10 m groß.'}
+              </p>
+
+              {shownView === 'aerial' && (
+                <p className="slider-hint aerial-hint">
+                  Farbig sind nur umgebaute Flächen. Ohne Umbauten ist nur das Luftbild zu sehen.
+                </p>
+              )}
+              {shownView === 'surface' && <SurfaceLegend />}
+              {shownView === 'temperature' && <TemperatureLegend />}
+
+              {shownView === 'temperature' && (
+                <Slider
+                  label="Uhrzeit"
+                  display={`${formatHour(hour)} Uhr`}
+                  value={hour}
+                  min={0}
+                  max={23.5}
+                  step={0.5}
+                  hint="Um 4 Uhr zeigt sich der nächtliche Hitzestau, um 14 bis 15 Uhr die größte Hitze."
+                  onChange={setHour}
+                />
+              )}
+
+              <Fold title="Bild unter dem Raster" note={customImage ? 'eigenes Bild' : undefined}>
+                <BackgroundControls
+                  hasBackground={background !== null && shownView !== 'aerial'}
+                  cellOpacity={cellOpacity}
+                  onCellOpacityChange={setCellOpacity}
+                  hasCustomImage={customImage !== null}
+                  onCustomImage={(file) => {
+                    setCustomImage(file ? URL.createObjectURL(file) : null)
+                    if (file) setView('aerial')
+                    setAlignment(DEFAULT_ALIGNMENT)
+                  }}
+                  alignment={alignment}
+                  onAlignmentChange={setAlignment}
+                />
+              </Fold>
+
+              {activePlace && (
+                <p className="attribution">
+                  {customImage ? OSM_ATTRIBUTION : `${IMAGERY_ATTRIBUTION} · ${OSM_ATTRIBUTION}`}
+                </p>
+              )}
+            </section>
+
+            <section className="panel step-panel" aria-labelledby="schritt-titel">
+              <div>
+                <p className="step-count">
+                  Schritt {step + 1} von {STEPS.length}
+                </p>
+                <h2 id="schritt-titel">{stepText.title}</h2>
+                <p className="panel-lead">{stepText.lead}</p>
+              </div>
+
+              {step === 1 && (
+                <>
+                  <div className="kpis">
+                    <div className="kpi">
+                      <p className="kpi-label">Oberflächen im Mittel</p>
+                      <p className="kpi-value">{formatTemp(baseMean)}</p>
+                      <p className="kpi-note">um {formatHour(hour)} Uhr</p>
+                    </div>
+                    <div className="kpi">
+                      <p className="kpi-label">Luft</p>
+                      <p className="kpi-value">{formatTemp(airTemperatureC(liveWeather, hour))}</p>
+                      <p className="kpi-note">um {formatHour(hour)} Uhr</p>
+                    </div>
+                    <div className="kpi">
+                      <p className="kpi-label">Versiegelt</p>
+                      <p className="kpi-value">{formatPercent(sealedShare(baseGrid))}</p>
+                    </div>
+                  </div>
+
+                  {activePlace ? (
+                    <Fold
+                      title="Flächen korrigieren"
+                      note={`${formatPercent(activePlace.guessedShare)} geschätzt`}
+                      onToggle={(open) => {
+                        if (!open) setBrush(null)
+                      }}
+                    >
+                      <p className="slider-hint">
+                        OpenStreetMap kennt nicht jede Fläche. Wo das Raster nicht zum Luftbild
+                        passt: Pinsel wählen, Zellen nachzeichnen und als Korrektur speichern.
+                      </p>
+                      <BrushPalette
+                        brush={brush}
+                        onChange={setBrush}
+                        paintedCount={overrides.size}
+                        onClear={() => setOverrides(NO_OVERRIDES)}
+                      />
+                      {activeKey && (
+                        <CorrectionControls
+                          placeKey={activeKey}
+                          corrections={corrections}
+                          hasUnsavedChanges={overrides.size > 0}
+                          onSave={() =>
+                            updateCorrections({
+                              ...corrections,
+                              // Gespeichert wird das Raster ohne Regler-Maßnahmen, nur mit gemalten Zellen.
+                              [activeKey]: correctionFromGrid(
+                                applyOverrides(baseGrid, overrides),
+                                new Date().toISOString().slice(0, 10),
+                              ),
+                            })
+                          }
+                          onRestoreOriginal={() => {
+                            const { [activeKey]: _removed, ...rest } = corrections
+                            updateCorrections(rest)
+                          }}
+                          onImport={(imported) => updateCorrections({ ...corrections, ...imported })}
+                        />
+                      )}
+                    </Fold>
+                  ) : (
+                    <Fold title="Viertel anpassen" defaultOpen>
+                      <DistrictControls
+                        district={district}
+                        onDistrictChange={(next) => {
+                          // Ein neu gewürfeltes Viertel passt nicht mehr zu den gemalten Zellen.
+                          if (next.seed !== district.seed) setOverrides(NO_OVERRIDES)
+                          setDistrict(next)
+                        }}
+                      />
+                    </Fold>
+                  )}
+
+                  <Fold
+                    title="Wetter ändern"
+                    note={weatherLabel ?? `heißer Sommertag, ${formatNumber(weather.tMaxC)} °C`}
+                  >
+                    <WeatherControls
+                      weather={weather}
+                      onWeatherChange={setWeather}
+                      weatherLocation={weatherLocation}
+                      weatherLabel={weatherLabel}
+                      onWeatherLoaded={(loaded, label) => {
+                        setWeather(loaded)
+                        setWeatherLabel(label)
+                      }}
+                      onWeatherReset={() => {
+                        setWeather(DEFAULT_WEATHER)
+                        setWeatherLabel(null)
+                      }}
+                      rainMm={rainMm}
+                      onRainChange={setRainMm}
+                    />
+                  </Fold>
+
+                  {activePlace && overrides.size > 0 && (
+                    <p className="slider-hint">
+                      Hinweis: {overrides.size} gemalte Zellen sind noch nicht als Korrektur
+                      gespeichert. Ohne Speichern zählen sie im nächsten Schritt als Umbau.
+                    </p>
+                  )}
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <div className="result-strip" aria-live="polite">
+                    <p>
+                      <span className="result-label">Heute</span>
+                      <strong>{formatTemp(baseMean)}</strong>
+                    </p>
+                    <span className="result-arrow" aria-hidden="true">
+                      →
+                    </span>
+                    <p>
+                      <span className="result-label">Nach Umbau</span>
+                      <strong>{formatTemp(mean)}</strong>
+                    </p>
+                    <p className={`result-delta${cooler ? ' is-cooler' : ''}`}>
+                      {anyChange ? formatDelta(mean - baseMean) : 'noch keine Maßnahme'}
+                    </p>
+                  </div>
+                  <p className="slider-hint">
+                    Mittel aller Oberflächen um {formatHour(hour)} Uhr.{' '}
+                    <button
+                      type="button"
+                      className="link-button"
+                      disabled={!anyChange}
+                      onClick={() => {
+                        setMeasures(NO_MEASURES)
+                        setOverrides(NO_OVERRIDES)
+                      }}
+                    >
+                      Alle Maßnahmen zurücksetzen
+                    </button>
+                  </p>
+
+                  <Fold
+                    title="Vorschlag berechnen lassen"
+                    note="beste Kühlung fürs Budget"
+                    group="weg"
+                    defaultOpen
+                  >
+                    <OptimizerPanel
+                      grid={baseGrid}
+                      weather={liveWeather}
+                      onApply={(cells) => {
+                        setMeasures(NO_MEASURES)
+                        setOverrides(cells)
+                      }}
+                    />
+                  </Fold>
+                  <Fold title="Anteile mit Reglern einstellen" note="z. B. 50 % Gründächer" group="weg">
+                    <MeasureControls measures={measures} onMeasuresChange={setMeasures} />
+                  </Fold>
+                  <Fold
+                    title="Einzelne Flächen selbst umbauen"
+                    note="mit dem Pinsel"
+                    group="weg"
+                    onToggle={(open) => {
+                      if (!open) setBrush(null)
+                    }}
+                  >
+                    <BrushPalette
+                      brush={brush}
+                      onChange={setBrush}
+                      paintedCount={overrides.size}
+                      onClear={() => setOverrides(NO_OVERRIDES)}
+                    />
+                  </Fold>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
+                  <div className="kpis">
+                    <div className="kpi">
+                      <p className="kpi-label">Ohne Maßnahmen (Ist)</p>
+                      <p className="kpi-value">{formatTemp(baseMean)}</p>
+                    </div>
+                    <div className="kpi">
+                      <p className="kpi-label">Mit Maßnahmen (Soll)</p>
+                      <p className="kpi-value">{formatTemp(mean)}</p>
+                      <p className={`kpi-note${cooler ? ' is-cooler' : ''}`}>
+                        {formatDelta(mean - baseMean)}
+                      </p>
+                    </div>
+                    <div className="kpi">
+                      <p className="kpi-label">Heißeste Fläche</p>
+                      <p className="kpi-value">{formatTemp(hottest)}</p>
+                      <p className="kpi-note">Luft: {formatTemp(airTemperatureC(liveWeather, hour))}</p>
+                    </div>
+                    <div className="kpi">
+                      <p className="kpi-label">Regenrückhalt</p>
+                      <p className="kpi-value">{formatLitres(rain.retainedL)}</p>
+                      <p
+                        className={`kpi-note${
+                          rain.retainedL > baseRain.retainedL + 1 ? ' is-cooler' : ''
+                        }`}
+                      >
+                        Ist: {formatLitres(baseRain.retainedL)}
+                      </p>
+                    </div>
+                    <div className="kpi">
+                      <p className="kpi-label">Mittlere Albedo</p>
+                      <p className="kpi-value">{formatNumber(albedo, 2)}</p>
+                      <p className="kpi-note">Ist: {formatNumber(baseAlbedo, 2)}</p>
+                    </div>
+                    <div className="kpi">
+                      <p className="kpi-label">Versiegelt</p>
+                      <p className="kpi-value">{formatPercent(sealedShare(grid))}</p>
+                      <p className="kpi-note">Ist: {formatPercent(sealedShare(baseGrid))}</p>
+                    </div>
+                  </div>
+                  <p className="kpi-caption">
+                    Temperaturen: Mittel aller Oberflächen um {formatHour(hour)} Uhr. Regenrückhalt:
+                    bei {formatNumber(rainMm, 0)} mm Starkregen auf {formatNumber(areaHectares, 0)}{' '}
+                    Hektar.
+                    {!anyChange && ' Noch ist keine Maßnahme gewählt, Ist und Soll sind gleich.'}
+                  </p>
+
+                  <div className="chart-block">
+                    <h3>Tagesgang über 24 Stunden</h3>
+                    <p className="panel-lead">
+                      Versiegelte Flächen speichern Hitze und bleiben nachts warm, begrünte kühlen
+                      schneller ab. Ein Klick ins Diagramm stellt die Uhrzeit ein.
+                    </p>
+                    <DayChart
+                      base={baseCurve}
+                      improved={curve}
+                      hour={hour}
+                      onHourChange={setHour}
+                      sunrise={sunrise}
+                      sunset={sunset}
+                    />
+                  </div>
+
+                  <Fold title="Stimmt das Modell?" note="Vergleich mit Satellitenmessungen">
+                    <p className="slider-hint">
+                      An den Beispielorten wird das Modell mit Oberflächentemperaturen verglichen,
+                      die der Satellit Landsat an heißen Sommertagen gemessen hat.
+                    </p>
+                    <ValidationPanel corrections={corrections} />
+                  </Fold>
+                  <Fold title="Wie wird gerechnet?" note="Formeln und Annahmen">
+                    <p className="slider-hint">
+                      Strahlungsbilanz, Verdunstung, Konvektion und Wärmespeicherung mit allen
+                      Stoffwerten und den Grenzen des Modells.
+                    </p>
+                    <div>
+                      <button type="button" className="button" onClick={() => setFormulasOpen(true)}>
+                        Formeln und Annahmen öffnen
+                      </button>
+                    </div>
+                  </Fold>
+                </>
+              )}
+
+              <div className="step-nav">
+                <button type="button" className="button" onClick={() => goTo(step - 1)}>
+                  ← {step === 1 ? 'Anderer Ort' : STEP_TEXT[step - 1]?.title}
+                </button>
+                {step < STEPS.length - 1 ? (
+                  <button
+                    type="button"
+                    className="button button-primary"
+                    onClick={() => goTo(step + 1)}
+                  >
+                    Weiter: {STEP_TEXT[step + 1]?.title} →
+                  </button>
+                ) : (
+                  <button type="button" className="button button-primary" onClick={() => goTo(0)}>
+                    Neuen Ort untersuchen
                   </button>
                 )}
-                <button
-                  type="button"
-                  aria-pressed={shownView === 'temperature'}
-                  onClick={() => setView('temperature')}
-                >
-                  Temperatur
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={shownView === 'surface'}
-                  onClick={() => setView('surface')}
-                >
-                  Flächen
-                </button>
               </div>
-            </div>
-
-            <CityGridView
-              grid={grid}
-              result={result}
-              hour={hour}
-              view={shownView}
-              baseCells={baseGrid.cells}
-              background={background}
-              cellOpacity={cellOpacity}
-              painting={brush !== null}
-              onPaint={paint}
-              onInspect={setInspected}
-            />
-
-            <p className="inspect" aria-live="polite">
-              {inspected !== null && inspectedCell
-                ? `${MATERIALS[inspectedCell.surface].label}${
-                    inspectedCell.mist ? ' mit Sprühnebel' : ''
-                  }: ${formatTemp(surfaceTempAt(result.cells[inspected], hour))} um ${formatHour(
-                    hour,
-                  )} Uhr, Tageshöchstwert ${formatTemp(result.cells[inspected].maxC)}`
-                : 'Zelle berühren oder mit den Pfeiltasten ansteuern, um Werte zu sehen. Eine Zelle ist 10 m × 10 m groß.'}
-            </p>
-
-            {activePlace && (
-              <p className="attribution">
-                {customImage ? OSM_ATTRIBUTION : `${IMAGERY_ATTRIBUTION} · ${OSM_ATTRIBUTION}`}
-              </p>
-            )}
-
-            {shownView === 'aerial' && (
-              <p className="slider-hint aerial-hint">
-                Luftbild mit Raster. Farbig sind nur Flächen, die durch Maßnahmen, den Vorschlag
-                oder den Pinsel umgebaut wurden. Die Farben stehen unten bei „Selbst umbauen".
-              </p>
-            )}
-            {shownView === 'temperature' && <TemperatureLegend />}
-
-            <Slider
-              label="Uhrzeit"
-              display={`${formatHour(hour)} Uhr`}
-              value={hour}
-              min={0}
-              max={23.5}
-              step={0.5}
-              hint="Um 4 Uhr zeigt sich der nächtliche Hitzestau, um 14 bis 15 Uhr die größte Hitze."
-              onChange={setHour}
-            />
-
-            <BackgroundControls
-              hasBackground={background !== null && shownView !== 'aerial'}
-              cellOpacity={cellOpacity}
-              onCellOpacityChange={setCellOpacity}
-              hasCustomImage={customImage !== null}
-              onCustomImage={(file) => {
-                setCustomImage(file ? URL.createObjectURL(file) : null)
-                if (file) setView('aerial')
-                setAlignment(DEFAULT_ALIGNMENT)
-              }}
-              alignment={alignment}
-              onAlignmentChange={setAlignment}
-            />
-          </section>
-
-          <section className="panel" aria-labelledby="tagesgang">
-            <div>
-              <h2 id="tagesgang">Tagesgang über 24 Stunden</h2>
-              <p className="panel-lead">
-                Mittlere Oberflächentemperatur des Viertels. Versiegelte Flächen speichern die
-                Hitze und bleiben nachts warm, begrünte kühlen schneller ab. Ein Klick ins
-                Diagramm stellt die Uhrzeit des Rasters ein.
-              </p>
-            </div>
-            <DayChart
-              base={baseCurve}
-              improved={curve}
-              hour={hour}
-              onHourChange={setHour}
-              sunrise={sunrise}
-              sunset={sunset}
-            />
-          </section>
-
-          <section className="panel" aria-labelledby="vorschlag">
-            <div>
-              <h2 id="vorschlag">Vorschlag berechnen</h2>
-              <p className="panel-lead">
-                Der Optimierer sucht für das Viertel ohne Maßnahmen die Kombination, die mit dem
-                Budget am stärksten kühlt.
-              </p>
-            </div>
-            <OptimizerPanel
-              grid={baseGrid}
-              weather={liveWeather}
-              onApply={(cells) => {
-                setMeasures(NO_MEASURES)
-                setOverrides(cells)
-              }}
-            />
-          </section>
-
-          <section className="panel" aria-labelledby="pinsel">
-            <h2 id="pinsel">Selbst umbauen</h2>
-            <BrushPalette
-              brush={brush}
-              onChange={setBrush}
-              paintedCount={overrides.size}
-              onClear={() => setOverrides(NO_OVERRIDES)}
-            />
-          </section>
-
-          <section className="panel" aria-labelledby="pruefung">
-            <div>
-              <h2 id="pruefung">Vergleich mit Satellitenmessungen</h2>
-              <p className="panel-lead">
-                Stimmt das Modell? An den Beispielorten wird es mit Oberflächentemperaturen
-                verglichen, die der Satellit Landsat an heißen Sommertagen gemessen hat.
-              </p>
-            </div>
-            <ValidationPanel corrections={corrections} />
-          </section>
-        </div>
+            </section>
+          </div>
+        )}
       </main>
 
       <FormulaDialog

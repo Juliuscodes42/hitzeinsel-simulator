@@ -79,11 +79,12 @@ input {
 }
 
 .app-header {
-  margin-bottom: 1.5rem;
-}
-
-.app-header .button {
-  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 .kennung {
@@ -103,24 +104,27 @@ h1 {
   color: var(--text-leise);
 }
 
-.layout {
+.workspace {
   display: grid;
   gap: 1rem;
   grid-template-columns: minmax(0, 1fr);
 }
 
 @media (min-width: 60rem) {
-  .layout {
-    grid-template-columns: 20rem minmax(0, 1fr);
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: start;
   }
 }
 
-.controls,
-.stage {
-  display: grid;
-  gap: 1rem;
+.workspace > *,
+.step-panel > * {
   min-width: 0;
+}
+
+.step-start {
+  max-width: 48rem;
+  margin: 0 auto;
 }
 
 /* ---------- Kästen ---------- */
@@ -1045,4 +1049,297 @@ tbody th {
 
 .aerial-hint {
   text-align: center;
+}
+
+/* ---------- Geführter Ablauf ---------- */
+
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: 0.6rem;
+  color: var(--text-leise);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.step:hover {
+  border-color: var(--akzent);
+}
+
+.step-number {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--flaeche-leise);
+  font-weight: 650;
+  font-size: 0.85rem;
+}
+
+.step-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step.is-done .step-number {
+  color: var(--akzent);
+}
+
+.step[aria-current='step'] {
+  border-color: var(--akzent);
+  color: var(--text);
+  font-weight: 650;
+}
+
+.step[aria-current='step'] .step-number {
+  background: var(--akzent);
+  color: var(--akzent-text);
+}
+
+@media (max-width: 34rem) {
+  .step {
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.4rem 0.2rem;
+    font-size: 0.72rem;
+    text-align: center;
+  }
+}
+
+.step-count {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--akzent);
+}
+
+.step-panel h2 {
+  font-size: 1.25rem;
+  line-height: 1.25;
+}
+
+.step-panel h3 {
+  font-size: 1rem;
+}
+
+.step-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--linie);
+}
+
+/* In einem Kasten heben sich Kennzahlen durch die leise Fläche ab. */
+.step-panel .kpi {
+  background: var(--flaeche-leise);
+  border: none;
+}
+
+.step-panel .kpi-caption {
+  margin-top: -0.5rem;
+}
+
+.chart-block {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* ---------- Aufklappbare Bereiche ---------- */
+
+.fold {
+  border: 1px solid var(--linie);
+  border-radius: 0.6rem;
+}
+
+.fold > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.75rem;
+  padding: 0.65rem 0.8rem;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 0.6rem;
+}
+
+.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold > summary::before {
+  content: '▸';
+  color: var(--akzent);
+}
+
+.fold[open] > summary::before {
+  content: '▾';
+}
+
+.fold > summary:hover {
+  background: var(--flaeche-leise);
+}
+
+.fold-title {
+  font-weight: 600;
+}
+
+.fold-note {
+  margin-left: auto;
+  font-size: 0.82rem;
+  color: var(--text-leise);
+}
+
+.fold-body {
+  display: grid;
+  gap: 0.9rem;
+  min-width: 0;
+  padding: 0.25rem 0.8rem 0.9rem;
+}
+
+.fold-body > * {
+  min-width: 0;
+}
+
+/* Innerhalb eines aufgeklappten Bereichs braucht es keine eigene Trennlinie. */
+.fold-body > .background-controls,
+.fold-body > .corrections {
+  padding-top: 0;
+  border-top: none;
+}
+
+/* ---------- Ortswahl im ersten Schritt ---------- */
+
+.choice {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.choice h3 {
+  font-size: 1rem;
+}
+
+.choice-cards {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.choice-card {
+  padding: 0.9rem 1rem;
+  background: var(--flaeche-leise);
+  border: 1px solid var(--linie);
+  border-radius: 0.6rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice-card:hover {
+  border-color: var(--akzent);
+}
+
+.choice-card::after {
+  content: ' →';
+  color: var(--akzent);
+}
+
+/* ---------- Zwischenstand bei den Maßnahmen ---------- */
+
+.result-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--flaeche-leise);
+  border-radius: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-strip strong {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.result-label {
+  font-size: 0.8rem;
+  color: var(--text-leise);
+}
+
+.result-arrow {
+  font-size: 1.3rem;
+  color: var(--text-leise);
+}
+
+.result-delta {
+  margin-left: auto;
+  color: var(--text-leise);
+}
+
+.result-delta.is-cooler {
+  font-size: 1.1rem;
+  font-weight: 650;
+  color: var(--kuehler);
+}
+
+/* ---------- Legende der Flächen ---------- */
+
+.surface-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3rem 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  color: var(--text-leise);
+}
+
+.surface-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.surface-legend span {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 0.2rem;
+  border: 1px solid var(--linie);
+}
+
+/* Auf breiten Bildschirmen bleibt das Raster beim Scrollen des Schritts sichtbar. */
+@media (min-width: 60rem) {
+  .map-panel {
+    position: sticky;
+    top: 0.75rem;
+  }
+
+  .map-panel .city-grid-wrap,
+  .map-panel > .city-grid {
+    max-width: min(100%, 58vh);
+  }
 }

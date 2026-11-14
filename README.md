@@ -38,7 +38,7 @@ deaktiviert sind, stattdessen `npm.cmd test` bzw. `npm.cmd run dev` verwenden.
 
 ## Raster korrigieren
 
-OpenStreetMap kennt nicht jede Fläche. Unter „Echter Ort" lässt sich ein Raster
+OpenStreetMap kennt nicht jede Fläche. Im Schritt „Ausgangslage" unter „Flächen korrigieren" lässt sich ein Raster
 nach dem Luftbild nachzeichnen und als Korrektur speichern. Die Korrektur gilt
 zunächst nur im Browser dieses Geräts.
 

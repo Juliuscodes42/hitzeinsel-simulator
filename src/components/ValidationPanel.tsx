@@ -85,7 +85,7 @@ export function ValidationPanel({ corrections }: ValidationPanelProps) {
       <p className="slider-hint">
         {anyCorrected
           ? `${correctedPlaces} von ${EXAMPLE_PLACES.length} Orten rechnen mit einem von Hand korrigierten Raster.`
-          : 'Alle Orte rechnen mit dem unveränderten Raster aus OpenStreetMap. Korrigierte Raster lassen sich unter „Echter Ort" speichern.'}
+          : 'Alle Orte rechnen mit dem unveränderten Raster aus OpenStreetMap. Korrigierte Raster lassen sich im Schritt „Ausgangslage" unter „Flächen korrigieren" speichern.'}
       </p>
 
       <div className="table-scroll">
