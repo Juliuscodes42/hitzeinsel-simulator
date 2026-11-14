@@ -1,11 +1,17 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { MATERIALS } from '../data/materials.ts'
 import { surfaceTempAt } from '../model/energyBalance.ts'
-import type { CityGrid, GridResult } from '../model/grid.ts'
+import type { CityGrid, GridCell, GridResult } from '../model/grid.ts'
 import { SURFACE_COLORS, temperatureColor } from './colors.ts'
 import { formatTemp } from './format.ts'
 
-export type ViewMode = 'temperature' | 'surface'
+/**
+ * Ansichten des Rasters:
+ *  - 'aerial': Luftbild klar sichtbar, nur umgebaute Zellen farbig darüber
+ *  - 'temperature': Oberflächentemperatur als Farbe
+ *  - 'surface': Oberflächentyp als Farbe
+ */
+export type ViewMode = 'aerial' | 'temperature' | 'surface'
 
 /** Bild, das unter dem Raster liegt (Luftbild oder eigenes Foto). */
 export interface GridBackground {
@@ -23,6 +29,8 @@ interface CityGridViewProps {
   hour: number
   view: ViewMode
   background: GridBackground | null
+  /** Zellen des Ist-Zustands, um in der Luftbild-Ansicht Umbauten zu erkennen. */
+  baseCells: GridCell[]
   /** Deckkraft der Zellenfarben über dem Bild (0–1). */
   cellOpacity: number
   /** Ist ein Pinsel gewählt? Dann malt Klicken und Ziehen. */
@@ -42,6 +50,7 @@ export function CityGridView({
   hour,
   view,
   background,
+  baseCells,
   cellOpacity,
   painting,
   onPaint,
@@ -114,10 +123,12 @@ export function CityGridView({
       )}
     <div
       ref={container}
-      className={`city-grid${painting ? ' is-painting' : ''}${background ? ' has-background' : ''}`}
+      className={`city-grid${painting ? ' is-painting' : ''}${background ? ' has-background' : ''}${
+        view === 'aerial' ? ' is-aerial' : ''
+      }`}
       style={{
         gridTemplateColumns: `repeat(${grid.width}, 1fr)`,
-        ['--cell-opacity' as string]: background ? cellOpacity : 1,
+        ['--cell-opacity' as string]: background && view !== 'aerial' ? cellOpacity : 1,
       }}
       role="group"
       aria-label="Stadtraster. Mit den Pfeiltasten bewegen, mit Enter malen."
@@ -136,20 +147,26 @@ export function CityGridView({
         const row = Math.floor(index / grid.width) + 1
         const column = (index % grid.width) + 1
         const label = MATERIALS[cell.surface].label
+        const base = baseCells[index]
+        const changed = !base || base.surface !== cell.surface || base.mist !== cell.mist
+        // Luftbild-Ansicht: nur umgebaute Zellen bekommen eine Farbe.
+        const fill =
+          view === 'temperature'
+            ? temperatureColor(tempC)
+            : view === 'surface' || changed
+              ? SURFACE_COLORS[cell.surface]
+              : 'transparent'
         return (
           <button
             key={index}
             type="button"
             data-index={index}
-            className={`cell${cell.mist ? ' has-mist' : ''}`}
-            style={{
-              background:
-                view === 'temperature' ? temperatureColor(tempC) : SURFACE_COLORS[cell.surface],
-            }}
+            className={`cell${cell.mist ? ' has-mist' : ''}${changed ? ' is-changed' : ''}`}
+            style={{ background: fill }}
             tabIndex={index === focusIndex ? 0 : -1}
             aria-label={`Zeile ${row}, Spalte ${column}: ${label}${
               cell.mist ? ' mit Sprühnebel' : ''
-            }, ${formatTemp(tempC)}`}
+            }, ${formatTemp(tempC)}${changed ? ', umgebaut' : ''}`}
             onFocus={() => {
               setFocusIndex(index)
               onInspect(index)

@@ -166,6 +166,9 @@ export default function App() {
       ? { url: activePlace.imageUrl, ...DEFAULT_ALIGNMENT }
       : null
 
+  // Ohne Bild gibt es keine Luftbild-Ansicht; dann wird die Temperatur gezeigt.
+  const shownView: ViewMode = view === 'aerial' && !background ? 'temperature' : view
+
   const baseMean = meanSurfaceTempAt(baseResult, hour)
   const mean = meanSurfaceTempAt(result, hour)
   const hottest = Math.max(...result.cells.map((cell) => surfaceTempAt(cell, hour)))
@@ -242,6 +245,7 @@ export default function App() {
                 onLoaded={(loaded) => {
                   setPlace(loaded)
                   setOverrides(NO_OVERRIDES)
+                  setView('aerial')
                 }}
               />
               {activePlace && activeKey && (
@@ -313,16 +317,25 @@ export default function App() {
             <div className="panel-head">
               <h2 id="karte">Stadtraster</h2>
               <div className="toggle" role="group" aria-label="Ansicht">
+                {background && (
+                  <button
+                    type="button"
+                    aria-pressed={shownView === 'aerial'}
+                    onClick={() => setView('aerial')}
+                  >
+                    Luftbild
+                  </button>
+                )}
                 <button
                   type="button"
-                  aria-pressed={view === 'temperature'}
+                  aria-pressed={shownView === 'temperature'}
                   onClick={() => setView('temperature')}
                 >
                   Temperatur
                 </button>
                 <button
                   type="button"
-                  aria-pressed={view === 'surface'}
+                  aria-pressed={shownView === 'surface'}
                   onClick={() => setView('surface')}
                 >
                   Flächen
@@ -334,7 +347,8 @@ export default function App() {
               grid={grid}
               result={result}
               hour={hour}
-              view={view}
+              view={shownView}
+              baseCells={baseGrid.cells}
               background={background}
               cellOpacity={cellOpacity}
               painting={brush !== null}
@@ -358,7 +372,13 @@ export default function App() {
               </p>
             )}
 
-            {view === 'temperature' && <TemperatureLegend />}
+            {shownView === 'aerial' && (
+              <p className="slider-hint aerial-hint">
+                Luftbild mit Raster. Farbig sind nur Flächen, die durch Maßnahmen, den Vorschlag
+                oder den Pinsel umgebaut wurden. Die Farben stehen unten bei „Selbst umbauen".
+              </p>
+            )}
+            {shownView === 'temperature' && <TemperatureLegend />}
 
             <Slider
               label="Uhrzeit"
@@ -372,12 +392,13 @@ export default function App() {
             />
 
             <BackgroundControls
-              hasBackground={background !== null}
+              hasBackground={background !== null && shownView !== 'aerial'}
               cellOpacity={cellOpacity}
               onCellOpacityChange={setCellOpacity}
               hasCustomImage={customImage !== null}
               onCustomImage={(file) => {
                 setCustomImage(file ? URL.createObjectURL(file) : null)
+                if (file) setView('aerial')
                 setAlignment(DEFAULT_ALIGNMENT)
               }}
               alignment={alignment}

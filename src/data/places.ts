@@ -139,7 +139,8 @@ function toMercator(lat: number, lon: number): [number, number] {
 }
 
 /** Adresse eines Luftbilds, das genau den Ausschnitt zeigt. */
-export function aerialImageUrl(bbox: BBox, sizePx = 1000): string {
+/** Der Dienst liefert höchstens 1024 Bildpunkte Kantenlänge. Das entspricht etwa 20 cm je Bildpunkt. */
+export function aerialImageUrl(bbox: BBox, sizePx = 1024): string {
   const [xMin, yMin] = toMercator(bbox.south, bbox.west)
   const [xMax, yMax] = toMercator(bbox.north, bbox.east)
   const params = new URLSearchParams({

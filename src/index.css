@@ -1024,3 +1024,25 @@ tbody th {
 .button:disabled {
   cursor: default;
 }
+
+/* ---------- Luftbild-Ansicht ---------- */
+
+/* Feine Linien statt Farbflächen, damit das Bild klar sichtbar bleibt. */
+.city-grid.is-aerial {
+  gap: 0;
+  padding: 0;
+}
+
+.city-grid.is-aerial .cell {
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.28);
+}
+
+/* Umgebaute Zellen: Farbe leicht durchscheinend mit hellem Rand. */
+.city-grid.is-aerial .cell.is-changed {
+  opacity: 0.82;
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.95);
+}
+
+.aerial-hint {
+  text-align: center;
+}
