@@ -35,3 +35,14 @@ deaktiviert sind, stattdessen `npm.cmd test` bzw. `npm.cmd run dev` verwenden.
 7. Optimierer für Maßnahmen ✓
 8. Vergleich mit Satelliten-Oberflächentemperaturen, Offline-Beispielorte ✓
 9. Optional: KI-Erklärtext
+
+## Raster korrigieren
+
+OpenStreetMap kennt nicht jede Fläche. Unter „Echter Ort" lässt sich ein Raster
+nach dem Luftbild nachzeichnen und als Korrektur speichern. Die Korrektur gilt
+zunächst nur im Browser dieses Geräts.
+
+Damit sie für alle Besucher gilt: „Alle Korrekturen herunterladen", die Datei
+`corrections.json` nach `src/data/corrections.json` kopieren (ersetzen) und
+committen. Der Vergleich mit den Satellitenmessungen rechnet dann für diese
+Orte zusätzlich mit dem korrigierten Raster.

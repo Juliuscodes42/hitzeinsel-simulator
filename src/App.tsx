@@ -13,6 +13,7 @@ import { BackgroundControls } from './components/BackgroundControls.tsx'
 import { BrushPalette, type Brush } from './components/BrushPalette.tsx'
 import { CityGridView, type ViewMode } from './components/CityGridView.tsx'
 import { ControlPanel, type GridSource } from './components/ControlPanel.tsx'
+import { CorrectionControls } from './components/CorrectionControls.tsx'
 import { DayChart } from './components/DayChart.tsx'
 import {
   formatDelta,
@@ -28,6 +29,14 @@ import { PlacePicker } from './components/PlacePicker.tsx'
 import { Slider } from './components/Slider.tsx'
 import { TemperatureLegend } from './components/TemperatureLegend.tsx'
 import { ValidationPanel } from './components/ValidationPanel.tsx'
+import {
+  applyCorrection,
+  correctionFromGrid,
+  loadCorrections,
+  placeKey,
+  storeCorrections,
+  type Corrections,
+} from './data/corrections.ts'
 import { MATERIALS } from './data/materials.ts'
 import { IMAGERY_ATTRIBUTION, OSM_ATTRIBUTION, type Place } from './data/places.ts'
 import { DEFAULT_WEATHER, airTemperatureC, daylight } from './model/atmosphere.ts'
@@ -71,6 +80,7 @@ export default function App() {
   const [alignment, setAlignment] = useState(DEFAULT_ALIGNMENT)
   const [cellOpacity, setCellOpacity] = useState(0.65)
   const [weatherLabel, setWeatherLabel] = useState<string | null>(null)
+  const [corrections, setCorrections] = useState<Corrections>(loadCorrections)
 
   // Beim schnellen Ziehen eines Reglers darf die Rechnung kurz hinterherhinken,
   // damit der Regler selbst flüssig bleibt.
@@ -80,10 +90,23 @@ export default function App() {
 
   // Ist-Zustand: das Viertel ohne Maßnahmen.
   const activePlace = mode === 'place' ? place : null
+  const activeKey = activePlace ? placeKey(activePlace) : null
+  const activeCorrection = activeKey ? corrections[activeKey] : undefined
+  // Ist-Zustand: echter Ort (mit Korrektur, falls gespeichert) oder Beispielviertel.
   const baseGrid = useMemo(
-    () => activePlace?.grid ?? generateDistrict(liveDistrict),
-    [activePlace, liveDistrict],
+    () =>
+      activePlace
+        ? applyCorrection(activePlace.grid, activeCorrection)
+        : generateDistrict(liveDistrict),
+    [activePlace, activeCorrection, liveDistrict],
   )
+
+  /** Übernimmt geänderte Korrekturen und merkt sie sich auf diesem Gerät. */
+  const updateCorrections = (next: Corrections) => {
+    setCorrections(next)
+    storeCorrections(next)
+    setOverrides(NO_OVERRIDES)
+  }
   const ranks = useMemo(
     () => cellRanks(liveDistrict.seed, baseGrid.cells.length),
     [liveDistrict.seed, baseGrid.cells.length],
@@ -221,6 +244,28 @@ export default function App() {
                   setOverrides(NO_OVERRIDES)
                 }}
               />
+              {activePlace && activeKey && (
+                <CorrectionControls
+                  placeKey={activeKey}
+                  corrections={corrections}
+                  hasUnsavedChanges={overrides.size > 0}
+                  onSave={() =>
+                    updateCorrections({
+                      ...corrections,
+                      // Gespeichert wird das Raster ohne Regler-Maßnahmen, nur mit gemalten Zellen.
+                      [activeKey]: correctionFromGrid(
+                        applyOverrides(baseGrid, overrides),
+                        new Date().toISOString().slice(0, 10),
+                      ),
+                    })
+                  }
+                  onRestoreOriginal={() => {
+                    const { [activeKey]: _removed, ...rest } = corrections
+                    updateCorrections(rest)
+                  }}
+                  onImport={(imported) => updateCorrections({ ...corrections, ...imported })}
+                />
+              )}
             </section>
           )}
 
@@ -395,7 +440,7 @@ export default function App() {
                 verglichen, die der Satellit Landsat an heißen Sommertagen gemessen hat.
               </p>
             </div>
-            <ValidationPanel />
+            <ValidationPanel corrections={corrections} />
           </section>
         </div>
       </main>

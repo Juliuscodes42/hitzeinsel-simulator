@@ -1,31 +1,57 @@
 import { useMemo } from 'react'
+import { applyCorrection, type Corrections } from '../data/corrections.ts'
 import { EXAMPLES_GENERATED, EXAMPLE_PLACES } from '../data/examplePlaces.ts'
 import { compareScene, summarizeComparisons } from '../model/validation.ts'
 import { formatDelta, formatHour, formatNumber, formatTemp } from './format.ts'
 
 const formatDate = (date: string): string => date.split('-').reverse().join('.')
 
+interface ValidationPanelProps {
+  /** Von Hand korrigierte Raster je Ort. */
+  corrections: Corrections
+}
+
 /**
  * Vergleich des Modells mit Satellitenmessungen (Landsat) an den Beispielorten.
  * Gerechnet wird immer mit dem aktuellen Modell, die Tabelle zeigt also den
  * tatsächlichen Stand und keine eingefrorenen Zahlen.
+ *
+ * Für Orte mit korrigiertem Raster wird zusätzlich mit der Korrektur gerechnet.
  */
-export function ValidationPanel() {
-  const rows = useMemo(
+export function ValidationPanel({ corrections }: ValidationPanelProps) {
+  // Mit dem unveränderten OpenStreetMap-Raster: ändert sich nie.
+  const original = useMemo(
     () =>
       EXAMPLE_PLACES.flatMap((place) =>
         place.scenes.map((scene) => ({ place, comparison: compareScene(place.grid, scene) })),
       ),
     [],
   )
+  // Mit Korrektur, wo es eine gibt.
+  const rows = useMemo(
+    () =>
+      original.map((row) => {
+        const correction = corrections[row.place.id]
+        return {
+          ...row,
+          corrected: correction
+            ? compareScene(applyCorrection(row.place.grid, correction), row.comparison.scene)
+            : null,
+        }
+      }),
+    [original, corrections],
+  )
 
   if (rows.length === 0) {
     return <p className="panel-lead">Für die Beispielorte liegen keine Satellitenaufnahmen vor.</p>
   }
 
-  const summary = summarizeComparisons(rows.map((row) => row.comparison))
+  const correctedPlaces = new Set(rows.filter((row) => row.corrected).map((row) => row.place.id)).size
+  const originalSummary = summarizeComparisons(rows.map((row) => row.comparison))
+  const summary = summarizeComparisons(rows.map((row) => row.corrected ?? row.comparison))
   const direction =
     Math.abs(summary.biasK) < 0.5 ? 'weder zu warm noch zu kalt' : summary.biasK > 0 ? 'zu warm' : 'zu kalt'
+  const anyCorrected = correctedPlaces > 0
 
   return (
     <div className="validation">
@@ -33,7 +59,11 @@ export function ValidationPanel() {
         <div className="kpi">
           <p className="kpi-label">Mittlere Abweichung (Betrag)</p>
           <p className="kpi-value">{formatNumber(summary.meanAbsErrorK)} K</p>
-          <p className="kpi-note">{summary.count} Aufnahmen</p>
+          <p className="kpi-note">
+            {anyCorrected
+              ? `ohne Korrekturen: ${formatNumber(originalSummary.meanAbsErrorK)} K`
+              : `${summary.count} Aufnahmen`}
+          </p>
         </div>
         <div className="kpi">
           <p className="kpi-label">Richtung</p>
@@ -45,9 +75,18 @@ export function ValidationPanel() {
           <p className="kpi-value">
             {summary.hottestQuadrantMatches} von {summary.count}
           </p>
-          <p className="kpi-note">Zufall wäre 1 von 4</p>
+          <p className="kpi-note">
+            {anyCorrected
+              ? `ohne Korrekturen: ${originalSummary.hottestQuadrantMatches} von ${summary.count}`
+              : 'Zufall wäre 1 von 4'}
+          </p>
         </div>
       </div>
+      <p className="slider-hint">
+        {anyCorrected
+          ? `${correctedPlaces} von ${EXAMPLE_PLACES.length} Orten rechnen mit einem von Hand korrigierten Raster.`
+          : 'Alle Orte rechnen mit dem unveränderten Raster aus OpenStreetMap. Korrigierte Raster lassen sich unter „Echter Ort" speichern.'}
+      </p>
 
       <div className="table-scroll">
         <table>
@@ -60,10 +99,12 @@ export function ValidationPanel() {
               <th scope="col">Landsat</th>
               <th scope="col">Modell</th>
               <th scope="col">Abweichung</th>
+              {anyCorrected && <th scope="col">korrigiert</th>}
+              {anyCorrected && <th scope="col">Abweichung</th>}
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ place, comparison }) => (
+            {rows.map(({ place, comparison, corrected }) => (
               <tr key={comparison.scene.sceneId}>
                 <th scope="row">{place.name}</th>
                 <td>{formatDate(comparison.scene.date)}</td>
@@ -72,6 +113,8 @@ export function ValidationPanel() {
                 <td>{formatTemp(comparison.scene.landsatMeanC)}</td>
                 <td>{formatTemp(comparison.modelMeanC)}</td>
                 <td>{formatDelta(comparison.differenceK)}</td>
+                {anyCorrected && <td>{corrected ? formatTemp(corrected.modelMeanC) : '–'}</td>}
+                {anyCorrected && <td>{corrected ? formatDelta(corrected.differenceK) : '–'}</td>}
               </tr>
             ))}
           </tbody>
@@ -95,8 +138,13 @@ export function ValidationPanel() {
             sich deshalb nicht prüfen, nur der Ausschnitt und seine vier Viertel.
           </li>
           <li>
-            Die Raster stammen unverändert aus OpenStreetMap. Geschätzte Flächen (zum Beispiel
-            Schulhöfe) wurden nicht von Hand korrigiert und sind eine Fehlerquelle.
+            Die Spalte „Modell" nutzt das unveränderte Raster aus OpenStreetMap. Geschätzte
+            Flächen (zum Beispiel Schulhöfe) sind dort eine Fehlerquelle. Die Spalte
+            „korrigiert" nutzt ein von Hand nach dem Luftbild nachgezeichnetes Raster.
+          </li>
+          <li>
+            Wer ein Raster korrigiert, sollte nur nach dem Luftbild gehen und nicht so lange
+            ändern, bis die Zahl passt. Sonst beweist der Vergleich nichts mehr.
           </li>
           <li>
             Der Satellit sieht von oben auf Dächer und Baumkronen und nimmt für alle Flächen
