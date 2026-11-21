@@ -3,11 +3,13 @@ import {
   dayOfYear,
   extraterrestrialDailySumMJ,
   hottestDayIndex,
+  morningTransmissivity,
   observationForDay,
   weatherFromObservation,
   type DayObservation,
   type OpenMeteoResponse,
 } from './observedWeather.ts'
+import { sinSolarElevation } from './atmosphere.ts'
 
 const hotDay: DayObservation = {
   date: '2026-07-20',
@@ -95,5 +97,30 @@ describe('Antwort von Open-Meteo', () => {
 
   test('ein Tag mit fehlenden Werten wird abgelehnt', () => {
     expect(() => observationForDay(response, 2)).toThrow()
+  })
+})
+
+describe('Durchlässigkeit der Morgenstunden', () => {
+  test('wolkenloser Morgen mit halber Strahlung ergibt τ = 0,5', () => {
+    // Strahlung = 0,5 · Strahlung ohne Atmosphäre zu jeder Stunde (Längengrad 0: UTC = Sonnenzeit)
+    const hourly = Array.from({ length: 25 }, (_, i) => {
+      let sum = 0
+      for (let k = 0; k < 60; k++) sum += 1361 * Math.max(0, sinSolarElevation(50, 172, i - 1 + (k + 0.5) / 60)) / 60
+      return 0.5 * sum
+    })
+    expect(morningTransmissivity(hourly, 10.5, 50, 172, 0)).toBeCloseTo(0.5, 2)
+  })
+
+  test('Wolken am Nachmittag zählen nicht', () => {
+    const clear = Array.from({ length: 25 }, (_, i) => {
+      let sum = 0
+      for (let k = 0; k < 60; k++) sum += 1361 * Math.max(0, sinSolarElevation(50, 172, i - 1 + (k + 0.5) / 60)) / 60
+      return 0.7 * sum
+    })
+    const cloudyAfternoon = clear.map((value, i) => (i > 12 ? value * 0.2 : value))
+    expect(morningTransmissivity(cloudyAfternoon, 10.5, 50, 172, 0)).toBeCloseTo(
+      morningTransmissivity(clear, 10.5, 50, 172, 0),
+      6,
+    )
   })
 })

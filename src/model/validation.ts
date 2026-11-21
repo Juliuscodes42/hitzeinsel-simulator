@@ -27,8 +27,13 @@ export interface LandsatScene {
   /** Gemessene Mittel der vier Viertel: Nordwest, Nordost, Südwest, Südost. */
   landsatQuadrantsC: number[]
   pixelCount: number
-  /** Wetter des Aufnahmetags. */
+  /**
+   * Wetter des Aufnahmetags. Die Durchlässigkeit τ stammt aus der Sonne der
+   * Morgenstunden bis zum Überflug (scripts/update-scene-sun.ts).
+   */
   weather: Weather
+  /** τ aus dem Tagesmittel, nur zum Nachvollziehen. */
+  dailyTransmissivity?: number
 }
 
 export interface Comparison {

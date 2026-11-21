@@ -132,3 +132,39 @@ export function observationForDay(response: OpenMeteoResponse, index: number): D
     hourlyWindMs: hours(response.hourly.wind_speed_10m),
   }
 }
+
+/**
+ * Durchlässigkeit τ aus der Sonnenstrahlung der Morgenstunden bis zu einem
+ * Zeitpunkt (z. B. dem Überflug eines Satelliten).
+ *
+ * Die Oberflächentemperatur am Vormittag hängt von der Sonne am Morgen ab,
+ * nicht von Wolken am Nachmittag. Ein Tag, der morgens klar und nachmittags
+ * bewölkt ist, hat im Tagesmittel ein zu kleines τ.
+ *
+ * @param hourlyRadiationUtc 24 Stundenwerte in W/m², Wert i = Mittel der Stunde i−1 bis i (UTC), wie bei Open-Meteo
+ * @param untilUtcHour Zeitpunkt in Dezimalstunden UTC
+ * @param lonDeg Längengrad, um UTC in wahre Sonnenzeit umzurechnen
+ */
+export function morningTransmissivity(
+  hourlyRadiationUtc: number[],
+  untilUtcHour: number,
+  latitudeDeg: number,
+  day: number,
+  lonDeg: number,
+): number {
+  let measured = 0
+  let withoutAtmosphere = 0
+  for (let i = 1; i < hourlyRadiationUtc.length; i++) {
+    const start = i - 1
+    if (start >= untilUtcHour) break
+    const share = Math.min(1, untilUtcHour - start)
+    measured += hourlyRadiationUtc[i] * share
+    // Strahlung ohne Atmosphäre im selben Zeitraum, in 10-Minuten-Schritten gemittelt
+    for (let k = 0; k < 6; k++) {
+      const solarHour = start + ((k + 0.5) / 6) * share + lonDeg / 15
+      withoutAtmosphere +=
+        (SOLAR_CONSTANT * Math.max(0, sinSolarElevation(latitudeDeg, day, solarHour)) * share) / 6
+    }
+  }
+  return clamp(withoutAtmosphere > 0 ? measured / withoutAtmosphere : 0, WEATHER_LIMITS.transmissivity)
+}

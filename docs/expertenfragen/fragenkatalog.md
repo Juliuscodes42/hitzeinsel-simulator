@@ -62,3 +62,5 @@ Betrifft `runoffCoefficient` in `src/data/materials.ts` und `src/model/water.ts`
 | F1 | Gibt es für unsere Stadt oder Region Messungen der Oberflächentemperatur (Thermalbefliegung, Messfahrten, Stadtklimaanalyse), die wir zum Vergleich nutzen dürfen? | offen |
 | F2 | Landsat liefert Oberflächentemperaturen mit 100 m Auflösung am Vormittag. Ist das ein sinnvoller Vergleich für ein Modell mit 10-m-Zellen, und worauf müssen wir achten? | offen |
 | F3 | Welche Abweichung zwischen einem so einfachen Modell und Messungen gilt in der Stadtklimatologie als akzeptabel? | offen |
+| F4 | Landsat misst an heißen Tagen um 10:30 Uhr auf grünen Flächen (NDVI über 0,5) 6 bis 13 °C mehr als die Lufttemperatur, unser Modell nur etwa so viel wie die Luft. Ist der Satellitenwert für Rasen und Baumkronen realistisch, oder ist er durch Mischpixel (100 m) und Emissionsgrad verfälscht? Siehe `docs/analyse-landsat.md`. | offen |
+| F5 | Zwischen grünen und versiegelten Flächen misst Landsat nur 2 bis 5 °C Unterschied, unser Modell rechnet zwischen Rasen und dunklem Dach rund 20 °C. Wie groß ist der Unterschied bei 2 m Auflösung (z. B. Thermalkamera) wirklich? | offen |
