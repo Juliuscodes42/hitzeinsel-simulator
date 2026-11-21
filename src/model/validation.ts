@@ -39,6 +39,12 @@ export interface Comparison {
   differenceK: number
   /** Liegt das wärmste Viertel im Modell dort, wo auch Landsat es misst? */
   hottestQuadrantMatches: boolean
+  /**
+   * Fehler im Muster: mittlerer Betrag, um den die Viertel vom eigenen Mittelwert
+   * abweichen, Modell gegen Messung. Unabhängig davon, ob das Modell insgesamt zu
+   * warm oder zu kalt ist; zeigt, ob warme und kühle Bereiche richtig verteilt sind.
+   */
+  patternErrorK: number
 }
 
 const mean = (values: number[]): number => values.reduce((sum, v) => sum + v, 0) / values.length
@@ -71,6 +77,11 @@ export function compareScene(grid: CityGrid, scene: LandsatScene): Comparison {
     modelQuadrantsC,
     differenceK: modelMeanC - scene.landsatMeanC,
     hottestQuadrantMatches: hottest(modelQuadrantsC) === hottest(scene.landsatQuadrantsC),
+    patternErrorK: mean(
+      modelQuadrantsC.map((value, i) =>
+        Math.abs(value - modelMeanC - (scene.landsatQuadrantsC[i] - scene.landsatMeanC)),
+      ),
+    ),
   }
 }
 
@@ -82,6 +93,8 @@ export interface ValidationSummary {
   biasK: number
   /** In so vielen Aufnahmen stimmt das wärmste Viertel überein. */
   hottestQuadrantMatches: number
+  /** Mittlerer Fehler im Muster der Viertel in Kelvin (siehe Comparison.patternErrorK). */
+  meanPatternErrorK: number
 }
 
 export function summarizeComparisons(comparisons: Comparison[]): ValidationSummary {
@@ -90,5 +103,6 @@ export function summarizeComparisons(comparisons: Comparison[]): ValidationSumma
     meanAbsErrorK: mean(comparisons.map((c) => Math.abs(c.differenceK))),
     biasK: mean(comparisons.map((c) => c.differenceK)),
     hottestQuadrantMatches: comparisons.filter((c) => c.hottestQuadrantMatches).length,
+    meanPatternErrorK: mean(comparisons.map((c) => c.patternErrorK)),
   }
 }

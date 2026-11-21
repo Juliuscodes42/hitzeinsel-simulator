@@ -1335,3 +1335,9 @@ tbody th {
 .slider-hint.is-error {
   color: #c23b22;
 }
+
+.validation-load {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+}

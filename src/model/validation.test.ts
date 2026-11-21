@@ -35,6 +35,18 @@ describe('Vergleich mit Landsat', () => {
     expect(comparison.differenceK).toBeCloseTo(comparison.modelMeanC - 40, 8)
   })
 
+  test('der Musterfehler hängt nicht davon ab, ob das Modell insgesamt zu warm ist', () => {
+    const warmer = { ...scene, landsatMeanC: 30, landsatQuadrantsC: [35, 28, 28, 29] }
+    expect(compareScene(grid, warmer).patternErrorK).toBeCloseTo(comparison.patternErrorK, 8)
+    // Gleiches Muster wie im Modell ergibt den Fehler 0.
+    const same = {
+      ...scene,
+      landsatMeanC: comparison.modelMeanC + 3,
+      landsatQuadrantsC: comparison.modelQuadrantsC.map((value) => value + 3),
+    }
+    expect(compareScene(grid, same).patternErrorK).toBeCloseTo(0, 8)
+  })
+
   test('die Zusammenfassung unterscheidet Betrag und Vorzeichen der Abweichung', () => {
     const tooWarm = { ...comparison, differenceK: 4 }
     const tooCold = { ...comparison, differenceK: -2, hottestQuadrantMatches: false }

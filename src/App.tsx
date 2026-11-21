@@ -840,7 +840,7 @@ export default function App() {
                       An den Beispielorten wird das Modell mit Oberflächentemperaturen verglichen,
                       die der Satellit Landsat an heißen Sommertagen gemessen hat.
                     </p>
-                    <ValidationPanel corrections={corrections} />
+                    <ValidationPanel corrections={corrections} points={allPoints} />
                   </Fold>
                   <Fold title="Wie wird gerechnet?" note="Formeln und Annahmen">
                     <p className="slider-hint">
