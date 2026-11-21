@@ -71,6 +71,10 @@ export interface Proposal {
   byKind: Record<ActionKind, KindSummary>
   /** Die umgebauten Zellen, fertig zum Übernehmen ins Raster. */
   cells: Map<number, GridCell>
+  /** Größtmögliche Abkühlung, wenn alles umgebaut wird. */
+  maxCoolingK: number
+  /** Bei Zielvorgabe: Wurde das Ziel erreicht? */
+  reached: boolean
 }
 
 const goalValue = (result: DayResult, goal: Goal): number =>
@@ -128,6 +132,11 @@ export function optimize(
   budget: number,
   goal: Goal,
   costs: CostTable = DEFAULT_COSTS,
+  /**
+   * Zielvorgabe in Kelvin: Statt ein Budget auszugeben, wird so lange gebaut,
+   * bis das Viertel um diesen Wert kühler ist (günstigste Maßnahmen zuerst).
+   */
+  targetK?: number,
 ): Proposal {
   const cellArea = grid.cellSizeM ** 2
   const cache = new Map<string, number>()
@@ -177,15 +186,29 @@ export function optimize(
     })
   })
 
-  // 2. Budget ausgeben: die Stufe mit der meisten Kühlung pro Euro zuerst.
+  // Größtmögliche Abkühlung: jede Zelle mit ihrer am stärksten kühlenden Stufe.
+  const bestPerCell = new Map<number, number>()
+  for (const step of steps) {
+    bestPerCell.set(step.index, Math.max(bestPerCell.get(step.index) ?? 0, step.option.coolingK))
+  }
+  const maxCoolingK = [...bestPerCell.values()].reduce((sum, value) => sum + value, 0) / grid.cells.length
+
+  // 2. Budget ausgeben bzw. bis zum Ziel bauen: die Stufe mit der meisten
+  //    Kühlung pro Euro zuerst.
   steps.sort((a, b) => b.efficiency - a.efficiency || a.index - b.index)
   const chosen = new Map<number, { level: number; option: Option }>()
-  let remaining = budget
+  let remaining = targetK === undefined ? budget : Infinity
+  // Abkühlung des Viertels mal Zellenzahl, damit nicht bei jedem Schritt geteilt wird.
+  const targetSum = (targetK ?? Infinity) * grid.cells.length
+  let coolingSum = 0
   for (const step of steps) {
-    const currentLevel = chosen.get(step.index)?.level ?? -1
+    if (coolingSum >= targetSum) break
+    const current = chosen.get(step.index)
+    const currentLevel = current?.level ?? -1
     if (step.level !== currentLevel + 1 || step.extraCost > remaining) continue
     chosen.set(step.index, { level: step.level, option: step.option })
     remaining -= step.extraCost
+    coolingSum += step.option.coolingK - (current?.option.coolingK ?? 0)
   }
 
   // 3. Ergebnis zusammenfassen.
@@ -210,6 +233,8 @@ export function optimize(
     coolingK: actions.reduce((sum, action) => sum + action.coolingK, 0) / grid.cells.length,
     byKind,
     cells,
+    maxCoolingK,
+    reached: targetK === undefined || coolingSum >= targetSum - 1e-9,
   }
 }
 

@@ -143,6 +143,15 @@ export function FormulaDialog({ open, onClose, weather, hour }: FormulaDialogPro
             Fläche ab. Die Kosten je Quadratmeter stammen aus dem Maßnahmenkatalog
             (Richtwerte mit Quellen, siehe docs/kosten.md).
           </p>
+          <Formula>
+            Kosten = Bau · (1 − Förderquote) · Bauten + (Pflege − Einsparung) · Jahre
+          </Formula>
+          <p>
+            Über einen Zeitraum gerechnet zählen auch Erneuerungen (z. B. Cool Roof nach 10
+            Jahren), Pflege und Einsparungen: Solarstrom und weniger Niederschlagswassergebühr.
+            Mit Zielvorgabe baut der Optimierer in derselben Reihenfolge, bis die gewünschte
+            Abkühlung erreicht ist, und nennt die Kosten dafür.
+          </p>
           <p>
             Solardächer und Sonnensegel lassen 5 % bzw. 20 % der Sonne durch: s = 1 − (1 −
             s_Gebäude) · (1 − s_Dach). Sie verdecken außerdem 70 % des Himmels (ψ · 0,3), weil ihre

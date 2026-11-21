@@ -54,7 +54,8 @@ Betrifft `runoffCoefficient` in `src/data/materials.ts` und `src/model/water.ts`
 | Nr. | Frage | Unser Wert | Status |
 |---|---|---|---|
 | E1 | Welche Abflussbeiwerte sind bei einem Starkregen (z. B. 40 mm in einer Stunde) für Asphalt, Pflaster, Rasengitter, Rasen und extensives Gründach anzusetzen? | 1,0 / 0,9 / 0,4 / 0,2 / 0,5 | offen |
-| E2 | Mit welcher Regenmenge rechnet unsere Stadt bei der Bemessung für Starkregen? | 40 mm | offen |
+| E2 | Mit welcher Regenmenge rechnet unsere Stadt bei der Bemessung für Starkregen? | KOSTRA-DWD-2020, 1 Stunde, 30 Jahre | offen |
+| E3 | Wie hoch ist die Niederschlagswassergebühr in Elmshorn, und welche Förderprogramme (Gründach, Entsiegelung, Bäume) gibt es für Schulen oder Privatleute? | 1 €/m²·a, Förderung nach Vorlage | offen |
 
 ## F. Überprüfung des Modells
 

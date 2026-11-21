@@ -39,6 +39,38 @@ Förderung. Sie schwanken je nach Ort, Untergrund und Größe stark.
 Speicher fangen im Modell den Abfluss der ganzen Umgebung auf, bis sie voll sind. In der
 Wirklichkeit muss das Wasser dorthin geleitet werden.
 
+## Kosten über einen Zeitraum
+
+Im Optimierer lassen sich die Kosten über einen Zeitraum (Standard 20 Jahre) rechnen
+(`src/model/costs.ts`):
+
+    Kosten je m² = Bau · (1 − Förderquote) · Anzahl Bauten + Pflege · Jahre − Einsparung · Jahre
+
+„Anzahl Bauten“: Eine Maßnahme mit 10 Jahren Lebensdauer wird in 20 Jahren zweimal gebaut.
+Zinsen und Preissteigerung sind nicht berücksichtigt.
+
+**Einsparungen**
+
+| Einsparung | Im Modell | Quelle |
+|---|---|---|
+| Strom aus Solardächern | 0,18 kWp je m², 950 kWh je kWp und Jahr, Wert 10 ct/kWh (einstellbar) | Ertrag 900–1.050 kWh/kWp [23]; Einspeisevergütung 2026 bis 7,70 ct/kWh, Eigenverbrauch spart mehr [24]; 0,18 kWp/m² eigene Annahme |
+| Niederschlagswassergebühr | 1 € je m² und Jahr mal weniger Abfluss (einstellbar) | Bremen 0,83, Münster 0,95, Dortmund 1,80 €/m² [25]; Elmshorn nicht gefunden |
+
+**Förderung**
+
+| Programm | Förderung | Quelle |
+|---|---|---|
+| KfW 444 „Natürlicher Klimaschutz in Kommunen“ (nur Kommunen): Grünflächen, Bäume, Entsiegelung | 80 % (finanzschwache Kommunen 90 %); andere Quellen nennen bis 50 % | [26][27] |
+| Hamburger Gründachförderung | 60 % der Herstellungskosten | [28] |
+| Lübeck, Gründach | 50 %, höchstens 30 €/m² (extensiv) | [29] |
+| Frankfurt, Gründach | 50 % | BuGG-Übersicht [30] |
+| Berlin, GründachPLUS | bis 95 €/m² | [31] |
+
+Die Vorlage „Stadt mit KfW 444“ setzt 80 % für Bäume, Rigolen, Entsiegelung, Mulden und
+Wasserbecken und 50 % für Gründächer. Ob ein Wasserbecken über KfW 444 förderfähig ist,
+ist nicht geprüft. Die Vorlage „Privat mit Gründach-Zuschuss“ setzt 50 % für Gründächer.
+Programme ändern sich oft; vor einer Planung bei der Stadt nachfragen (Frage E3).
+
 ## Rechtlicher Hinweis
 
 In Schleswig-Holstein müssen neue offene Parkplätze ab 70 Stellplätzen mit Photovoltaik
@@ -69,6 +101,16 @@ Parkplätze betrifft das nur bei grundlegender Sanierung. Bitte am Gesetzestext 
 20. Stadt Wiesbaden: Sprühnebel. https://www.wiesbaden.de/leben-in-wiesbaden/umwelt-natur-klima/klimaschutz/spruehnebel
 21. Arizona State University (KEEP): Studie zu Verschattung durch PV-Parkdächer und Bäume. https://keep.lib.asu.edu/system/files/2022-05/1-s2.0-s0038092x06002908-main_0.pdf
 22. KNE: Länderregelungen Parkplatz-Photovoltaik. https://www.naturschutz-energiewende.de/wp-content/uploads/KNE-Antwort_353_Laenderregelungen-Parkplatz-Photovoltaik.pdf
+
+23. 42watt: Solar-Carport (Erträge nach Fraunhofer ISE). https://42watt.de/magazin/solar-carport
+24. Bundesnetzagentur: EEG-Förderung und -Fördersätze. https://www.bundesnetzagentur.de/DE/Fachthemen/ElektrizitaetundGas/ErneuerbareEnergien/EEG_Foerderung/start.html
+25. Bremen: https://www.service.bremen.de/niederschlagswassergebuehren-bezahlen-188773 · Münster: https://www.stadt-muenster.de/tiefbauamt/beitraege-und-gebuehren/gebuehren.html · Dortmund: https://www.dortmund.de/themen/sauberkeit-und-entsorgung/zustands-und-funktionspruefung/gebuereneinsparungen/
+26. KfW: Natürlicher Klimaschutz in Kommunen (444). https://www.kfw.de/inlandsfoerderung/%C3%96ffentliche-Einrichtungen/St%C3%A4dte-und-Gemeinden-gestalten/F%C3%B6rderprodukte/Nat%C3%BCrlicher-Klimaschutz-in-Kommunen-(444)/
+27. Bundesumweltministerium: Natürlicher Klimaschutz in Kommunen. https://www.bundesumweltministerium.de/FG44
+28. Hamburg: Gründachförderung. https://www.hamburg.de/politik-und-verwaltung/behoerden/bukea/themen/hamburgs-gruen/gruendach-und-gruene-fassaden/foerderung
+29. Hansestadt Lübeck: Förderrichtlinie Gründach. https://www.luebeck.de/files/stadtentwicklung/Klimaschutz/Foerderrichtlinie_Gruendach_Hansestadt_Luebeck.pdf
+30. BuGG: Städte mit Förderprogrammen für Dachbegrünungen. https://www.gebaeudegruen.info/wp-content/uploads/2026/01/Staedte-mit-Foerderprogrammen-fuer-Dachbegruenungen.pdf
+31. Berlin: GründachPLUS. https://www.berlin.de/gruenedaecher/
 
 Die meisten Preisangaben stammen aus Ratgebern, Anbieter- und Vermittlungsseiten, nicht aus
 Kostenstudien. Für die Arbeit sollten sie mit Angeboten oder Auskünften der Stadt

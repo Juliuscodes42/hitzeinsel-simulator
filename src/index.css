@@ -1341,3 +1341,40 @@ tbody th {
   gap: 0.4rem;
   justify-items: start;
 }
+
+/* ---------- Kosten und Förderung ---------- */
+
+.funding-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.cost-table td,
+.cost-table th {
+  vertical-align: middle;
+}
+
+.cost-number {
+  width: 4.5rem;
+  padding: 0.2rem 0.35rem;
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: 0.35rem;
+  color: var(--text);
+  text-align: right;
+}
+
+.cost-extras {
+  white-space: normal;
+  min-width: 9rem;
+  font-size: 0.8rem;
+  color: var(--text-leise);
+  text-align: left;
+}
+
+.confidence {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-leise);
+}
