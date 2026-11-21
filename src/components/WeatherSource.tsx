@@ -21,6 +21,9 @@ interface WeatherSourceProps {
   label: string | null
   onLoaded: (weather: Weather, label: string) => void
   onReset: () => void
+  /** Liegt der typische Hitzetag der Region vor? */
+  typicalAvailable: boolean
+  onTypical: () => void
 }
 
 const formatDate = (date: string): string => {
@@ -29,10 +32,17 @@ const formatDate = (date: string): string => {
 }
 
 /**
- * Holt echtes Wetter für den gewählten Ort und stellt die Regler darauf ein:
- * entweder den heutigen Tag oder den heißesten Tag des letzten Sommers.
+ * Wählt, welcher Tag gerechnet wird: der typische Hitzetag der Region
+ * (Standard), der heutige Tag oder der heißeste Tag des letzten Sommers.
  */
-export function WeatherSource({ location, label, onLoaded, onReset }: WeatherSourceProps) {
+export function WeatherSource({
+  location,
+  label,
+  onLoaded,
+  onReset,
+  typicalAvailable,
+  onTypical,
+}: WeatherSourceProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const summer = lastCompleteSummer()
@@ -60,6 +70,11 @@ export function WeatherSource({ location, label, onLoaded, onReset }: WeatherSou
   return (
     <div className="weather-source">
       <div className="weather-buttons">
+        {typicalAvailable && (
+          <button type="button" className="button" disabled={busy} onClick={onTypical}>
+            Typischer Hitzetag
+          </button>
+        )}
         <button
           type="button"
           className="button"
@@ -89,7 +104,7 @@ export function WeatherSource({ location, label, onLoaded, onReset }: WeatherSou
             (label
               ? `${label}. ${WEATHER_ATTRIBUTION}`
               : `Standardtag: heißer, klarer Julitag. Oder echtes Wetter für ${location.name} laden.`))}{' '}
-        {label && !busy && (
+        {label && !busy && !typicalAvailable && (
           <button type="button" className="link-button" onClick={onReset}>
             Standardtag
           </button>

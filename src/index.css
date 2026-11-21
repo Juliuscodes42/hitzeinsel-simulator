@@ -1343,3 +1343,20 @@ tbody th {
     max-width: min(100%, 58vh);
   }
 }
+
+/* ---------- Starkregen der Region ---------- */
+
+.rain-periods {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: -0.4rem;
+}
+
+.rain-periods .toggle {
+  flex-wrap: wrap;
+}
+
+.rain-periods .toggle button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

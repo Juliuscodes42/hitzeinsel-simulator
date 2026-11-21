@@ -1,5 +1,7 @@
 import { shortwaveDown, type Weather } from '../model/atmosphere.ts'
+import { RETURN_PERIODS, type ReturnPeriod } from '../model/heavyRain.ts'
 import { WEATHER_LIMITS } from '../model/observedWeather.ts'
+import { KOSTRA_ATTRIBUTION } from '../data/regionalWeather.ts'
 import { formatNumber } from './format.ts'
 import { Slider } from './Slider.tsx'
 import { WeatherSource, type WeatherLocation } from './WeatherSource.tsx'
@@ -13,9 +15,18 @@ interface WeatherControlsProps {
   weatherLabel: string | null
   onWeatherLoaded: (weather: Weather, label: string) => void
   onWeatherReset: () => void
+  /** Liegt der typische Hitzetag der Region vor? */
+  typicalAvailable: boolean
+  onTypical: () => void
+  /** Konnte das Wetter der Region nicht geladen werden? */
+  regionalError: boolean
   /** Regenmenge eines Starkregens in mm. */
   rainMm: number
   onRainChange: (rainMm: number) => void
+  /** Starkregen der Region (KOSTRA) je Wiederkehrzeit. */
+  regionalRain: Partial<Record<ReturnPeriod, number>>
+  rainPeriod: ReturnPeriod
+  onRainPeriodChange: (period: ReturnPeriod) => void
 }
 
 /** Wetter des simulierten Tags: echtes Wetter laden oder von Hand einstellen. */
@@ -26,9 +37,17 @@ export function WeatherControls({
   weatherLabel,
   onWeatherLoaded,
   onWeatherReset,
+  typicalAvailable,
+  onTypical,
+  regionalError,
   rainMm,
   onRainChange,
+  regionalRain,
+  rainPeriod,
+  onRainPeriodChange,
 }: WeatherControlsProps) {
+  const hasRegionalRain = RETURN_PERIODS.some((period) => regionalRain[period] !== undefined)
+  const rainMatchesRegion = regionalRain[rainPeriod] === rainMm
   return (
     <>
       <WeatherSource
@@ -36,7 +55,15 @@ export function WeatherControls({
         label={weatherLabel}
         onLoaded={onWeatherLoaded}
         onReset={onWeatherReset}
+        typicalAvailable={typicalAvailable}
+        onTypical={onTypical}
       />
+      {regionalError && (
+        <p className="slider-hint is-error" role="status">
+          Das Wetter der Region konnte nicht geladen werden. Gerechnet wird mit einem
+          Standardtag.
+        </p>
+      )}
       <Slider
         label="Sonneneinstrahlung"
         display={`${Math.round(shortwaveDown(weather, 12))} W/m²`}
@@ -70,15 +97,37 @@ export function WeatherControls({
         }
       />
       <Slider
-        label="Starkregen"
+        label="Starkregen in einer Stunde"
         display={`${formatNumber(rainMm, 0)} mm`}
         value={rainMm}
         min={10}
         max={100}
-        step={5}
-        hint="Regenmenge eines Gewitters. Bestimmt nur den Regenrückhalt."
+        step={1}
+        hint={
+          hasRegionalRain && rainMatchesRegion
+            ? `So viel Regen fällt hier in einer Stunde etwa einmal in ${rainPeriod} Jahren. Bestimmt nur den Regenrückhalt.`
+            : 'Regenmenge eines Gewitters. Bestimmt nur den Regenrückhalt.'
+        }
         onChange={onRainChange}
       />
+      {hasRegionalRain && (
+        <div className="rain-periods">
+          <div className="toggle" role="group" aria-label="Wie selten ist der Starkregen?">
+            {RETURN_PERIODS.map((period) => (
+              <button
+                key={period}
+                type="button"
+                aria-pressed={rainMatchesRegion && rainPeriod === period}
+                disabled={regionalRain[period] === undefined}
+                onClick={() => onRainPeriodChange(period)}
+              >
+                alle {period} Jahre
+              </button>
+            ))}
+          </div>
+          <p className="slider-hint">{KOSTRA_ATTRIBUTION}</p>
+        </div>
+      )}
     </>
   )
 }

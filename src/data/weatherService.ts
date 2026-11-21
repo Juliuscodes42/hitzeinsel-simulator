@@ -4,6 +4,7 @@
  * Archiv: Reanalyse-Daten (ERA5), also nachträglich berechnetes Wetter.
  */
 
+import { typicalHeatDay, type DailySeries, type HeatDay } from '../model/heatDay.ts'
 import {
   hottestDayIndex,
   observationForDay,
@@ -12,6 +13,9 @@ import {
 } from '../model/observedWeather.ts'
 
 export const WEATHER_ATTRIBUTION = 'Wetterdaten: Open-Meteo.com'
+
+/** Standardort, wenn kein echter Ort geladen ist (erfundenes Beispielviertel). */
+export const DEFAULT_LOCATION = { name: 'Elmshorn', lat: 53.7536, lon: 9.6526 }
 
 const DAILY = 'temperature_2m_max,temperature_2m_min,shortwave_radiation_sum'
 const HOURLY = 'temperature_2m,relative_humidity_2m,wind_speed_10m'
@@ -63,4 +67,62 @@ export async function fetchHottestSummerDay(
     end_date: `${year}-08-31`,
   })
   return observationForDay(response, hottestDayIndex(response))
+}
+
+/* ---------- Typischer Hitzetag ---------- */
+
+/** So viele Sommer fließen in den typischen Hitzetag ein. */
+export const HEAT_DAY_YEARS = 10
+
+const HEAT_DAY_DAILY = [
+  'temperature_2m_max',
+  'temperature_2m_min',
+  'shortwave_radiation_sum',
+  'wind_speed_10m_mean',
+  'relative_humidity_2m_min',
+].join(',')
+
+/** Schlüssel für gespeicherte Hitzetage: Koordinaten auf etwa 100 m gerundet. */
+export const heatDayKey = (lat: number, lon: number, lastSummer: number): string =>
+  `${lat.toFixed(3)},${lon.toFixed(3)},${lastSummer}`
+
+/**
+ * Typischer Hitzetag aus den letzten zehn Sommern (Open-Meteo-Archiv, ERA5).
+ * Das Ergebnis wird auf dem Gerät gespeichert, weil es sich nur einmal im Jahr ändert.
+ */
+export async function fetchTypicalHeatDay(
+  lat: number,
+  lon: number,
+  lastSummer = lastCompleteSummer(),
+): Promise<HeatDay> {
+  const key = `hitzetag:${heatDayKey(lat, lon, lastSummer)}`
+  try {
+    const cached = globalThis.localStorage?.getItem(key)
+    if (cached) return JSON.parse(cached) as HeatDay
+  } catch {
+    // Speicher nicht verfügbar: einfach neu laden.
+  }
+
+  const url = new URL('https://archive-api.open-meteo.com/v1/archive')
+  for (const [name, value] of Object.entries({
+    ...coordinates(lat, lon),
+    start_date: `${lastSummer - HEAT_DAY_YEARS + 1}-06-01`,
+    end_date: `${lastSummer}-08-31`,
+    daily: HEAT_DAY_DAILY,
+    timezone: 'auto',
+    wind_speed_unit: 'ms',
+  })) {
+    url.searchParams.set(name, value)
+  }
+  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+  if (!response.ok) throw new Error(`Wetterdienst antwortet mit Fehler ${response.status}.`)
+  const { daily } = (await response.json()) as { daily: DailySeries }
+  const heatDay = typicalHeatDay(daily, lat)
+
+  try {
+    globalThis.localStorage?.setItem(key, JSON.stringify(heatDay))
+  } catch {
+    // Speicher voll oder gesperrt: nicht schlimm.
+  }
+  return heatDay
 }

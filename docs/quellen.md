@@ -26,6 +26,8 @@ aus dem Gedächtnis eingetragen und sind noch nicht am Original kontrolliert.
 | Ortssuche | Nominatim (OpenStreetMap) | `src/data/places.ts` |
 | Luftbilder | Esri World Imagery (Esri, Maxar, Earthstar Geographics). Die Bilder werden nur live angezeigt und nicht gespeichert. Nutzungsbedingungen für Schulprojekte prüfen. | `src/data/places.ts` |
 | Wetter (Vorhersage und Archiv/Reanalyse ERA5) | Open-Meteo.com, Lizenz CC BY 4.0. P. Zippenfenig: Open-Meteo.com Weather API, Zenodo, 2023 | `src/data/weatherService.ts` |
+| Typischer Hitzetag | Open-Meteo-Archiv (ERA5), Tageswerte der letzten 10 Sommer (Juni bis August). Eigenes Verfahren: Mittel der 3 heißesten Tage je Sommer. Für die Beispielorte vorab berechnet mit `scripts/build-heat-days.ts`. | `src/model/heatDay.ts`, `src/data/regionalWeather.ts` |
+| Starkregen | KOSTRA-DWD-2020, Deutscher Wetterdienst, Dauerstufe 60 Minuten, Wiederkehrzeiten 5, 30 und 100 Jahre, 5-km-Raster (ETRS89-LAEA). Lizenz CC BY 4.0 (dwd.de/copyright). Aufbereitet mit `scripts/build-kostra.py`. | `src/model/heavyRain.ts`, `src/data/kostra.json` |
 | Oberflächentemperatur aus dem All | Landsat 8/9 Collection 2 Level-2 Surface Temperature (Band ST_B10), U.S. Geological Survey, gemeinfrei. Abgerufen über den Microsoft Planetary Computer. | `scripts/build-places.ts`, `src/model/validation.ts` |
 
 ## Eigene Annahmen ohne Quelle

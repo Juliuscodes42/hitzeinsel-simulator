@@ -1,0 +1,75 @@
+{
+ "generated": "2026-11-21",
+ "days": {
+  "53.754,9.653,2026": {
+   "weather": {
+    "latitudeDeg": 53.7536,
+    "dayOfYear": 197,
+    "transmissivity": 0.5973182404784877,
+    "tMaxC": 31.7,
+    "tMinC": 17.1,
+    "windSpeed": 3,
+    "relHumidityAtMax": 0.3526666666666667
+   },
+   "firstYear": 2017,
+   "lastYear": 2026,
+   "dayCount": 30
+  },
+  "53.758,9.674,2026": {
+   "weather": {
+    "latitudeDeg": 53.757891,
+    "dayOfYear": 197,
+    "transmissivity": 0.5973283980516279,
+    "tMaxC": 31.7,
+    "tMinC": 17.1,
+    "windSpeed": 3,
+    "relHumidityAtMax": 0.3526666666666667
+   },
+   "firstYear": 2017,
+   "lastYear": 2026,
+   "dayCount": 30
+  },
+  "50.936,6.948,2026": {
+   "weather": {
+    "latitudeDeg": 50.936038,
+    "dayOfYear": 195,
+    "transmissivity": 0.5885905054026391,
+    "tMaxC": 34.7,
+    "tMinC": 19.5,
+    "windSpeed": 2.5,
+    "relHumidityAtMax": 0.28
+   },
+   "firstYear": 2017,
+   "lastYear": 2026,
+   "dayCount": 30
+  },
+  "52.510,13.376,2026": {
+   "weather": {
+    "latitudeDeg": 52.509801,
+    "dayOfYear": 202,
+    "transmissivity": 0.6172565010316722,
+    "tMaxC": 34.8,
+    "tMinC": 19.7,
+    "windSpeed": 3,
+    "relHumidityAtMax": 0.2533333333333333
+   },
+   "firstYear": 2017,
+   "lastYear": 2026,
+   "dayCount": 30
+  },
+  "47.976,7.819,2026": {
+   "weather": {
+    "latitudeDeg": 47.976354,
+    "dayOfYear": 197,
+    "transmissivity": 0.618633399338336,
+    "tMaxC": 33.8,
+    "tMinC": 19,
+    "windSpeed": 2,
+    "relHumidityAtMax": 0.308
+   },
+   "firstYear": 2017,
+   "lastYear": 2026,
+   "dayCount": 30
+  }
+ }
+}

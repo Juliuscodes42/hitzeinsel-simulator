@@ -12,7 +12,7 @@
  *          → Simulation beider Raster → Raster-Ansicht und Kennzahlen
  */
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_ALIGNMENT } from './components/alignment.ts'
 import { BackgroundControls } from './components/BackgroundControls.tsx'
 import { BrushPalette, type Brush } from './components/BrushPalette.tsx'
@@ -49,6 +49,8 @@ import {
   type Corrections,
 } from './data/corrections.ts'
 import { MATERIALS } from './data/materials.ts'
+import { loadRegionalWeather, type RegionalWeather } from './data/regionalWeather.ts'
+import { DEFAULT_LOCATION } from './data/weatherService.ts'
 import { IMAGERY_ATTRIBUTION, OSM_ATTRIBUTION, type Place } from './data/places.ts'
 import { DEFAULT_WEATHER, airTemperatureC, daylight } from './model/atmosphere.ts'
 import {
@@ -61,6 +63,7 @@ import {
   type DistrictParams,
 } from './model/district.ts'
 import { surfaceTempAt } from './model/energyBalance.ts'
+import type { ReturnPeriod } from './model/heavyRain.ts'
 import {
   meanAlbedo,
   meanDailyCurve,
@@ -112,6 +115,10 @@ export default function App() {
   const [alignment, setAlignment] = useState(DEFAULT_ALIGNMENT)
   const [cellOpacity, setCellOpacity] = useState(0.65)
   const [weatherLabel, setWeatherLabel] = useState<string | null>(null)
+  // Wetter der Region: typischer Hitzetag und Starkregen, automatisch geladen.
+  const [regionalLoaded, setRegionalLoaded] = useState<{ key: string; data: RegionalWeather } | null>(null)
+  const [regionalFailed, setRegionalFailed] = useState<string | null>(null)
+  const [rainPeriod, setRainPeriod] = useState<ReturnPeriod>(30)
   const [corrections, setCorrections] = useState<Corrections>(loadCorrections)
 
   // Beim schnellen Ziehen eines Reglers darf die Rechnung kurz hinterherhinken,
@@ -190,7 +197,44 @@ export default function App() {
         lat: (activePlace.bbox.north + activePlace.bbox.south) / 2,
         lon: (activePlace.bbox.east + activePlace.bbox.west) / 2,
       }
-    : { name: 'Elmshorn', lat: DEFAULT_WEATHER.latitudeDeg, lon: 9.65 }
+    : DEFAULT_LOCATION
+
+  const applyRegionalRef = useRef<(data: RegionalWeather) => void>(() => {})
+  const typicalLabel = (data: RegionalWeather) =>
+    `Typischer Hitzetag in ${weatherLocation.name}: Mittel der ${data.heatDay.dayCount} heißesten Sommertage ${data.heatDay.firstYear}–${data.heatDay.lastYear}`
+
+  /** Stellt Wetter und Starkregen auf die Werte der Region ein. */
+  const applyRegional = (data: RegionalWeather, period = rainPeriod) => {
+    setWeather(data.heatDay.weather)
+    setWeatherLabel(typicalLabel(data))
+    const mm = data.rainMm[period]
+    if (mm !== undefined) setRainMm(mm)
+  }
+  useEffect(() => {
+    applyRegionalRef.current = applyRegional
+  })
+
+  // Bei jedem neuen Ort das Wetter der Region laden. Von Hand geänderte Regler
+  // werden dabei überschrieben, weil sie zum vorherigen Ort gehörten.
+  const { lat: weatherLat, lon: weatherLon } = weatherLocation
+  const regionKey = `${weatherLat},${weatherLon}`
+  useEffect(() => {
+    let cancelled = false
+    loadRegionalWeather(weatherLat, weatherLon)
+      .then((data) => {
+        if (cancelled) return
+        setRegionalLoaded({ key: `${weatherLat},${weatherLon}`, data })
+        applyRegionalRef.current(data)
+      })
+      .catch(() => {
+        if (!cancelled) setRegionalFailed(`${weatherLat},${weatherLon}`)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [weatherLat, weatherLon])
+  const regional = regionalLoaded?.key === regionKey ? regionalLoaded.data : null
+  const regionalStatus = regional ? 'ready' : regionalFailed === regionKey ? 'error' : 'loading'
 
   const background = customImage
     ? { url: customImage, ...alignment }
@@ -227,6 +271,11 @@ export default function App() {
   }
 
   const stepText = STEP_TEXT[step]
+
+  const weatherNote =
+    regionalStatus === 'loading' && !regional
+      ? 'wird geladen …'
+      : `${weatherLabel ? weatherLabel.split(/[:(]/)[0].trim() : 'Standardtag'}, ${formatNumber(weather.tMaxC)} °C`
 
   return (
     <div className="app">
@@ -463,7 +512,7 @@ export default function App() {
 
                   <Fold
                     title="Wetter ändern"
-                    note={weatherLabel ?? `heißer Sommertag, ${formatNumber(weather.tMaxC)} °C`}
+                    note={weatherNote}
                   >
                     <WeatherControls
                       weather={weather}
@@ -474,12 +523,22 @@ export default function App() {
                         setWeather(loaded)
                         setWeatherLabel(label)
                       }}
+                      typicalAvailable={regional !== null}
+                      onTypical={() => regional && applyRegional(regional)}
+                      regionalError={regionalStatus === 'error'}
                       onWeatherReset={() => {
                         setWeather(DEFAULT_WEATHER)
                         setWeatherLabel(null)
                       }}
                       rainMm={rainMm}
                       onRainChange={setRainMm}
+                      regionalRain={regional?.rainMm ?? {}}
+                      rainPeriod={rainPeriod}
+                      onRainPeriodChange={(period) => {
+                        setRainPeriod(period)
+                        const mm = regional?.rainMm[period]
+                        if (mm !== undefined) setRainMm(mm)
+                      }}
                     />
                   </Fold>
 
