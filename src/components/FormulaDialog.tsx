@@ -143,6 +143,19 @@ export function FormulaDialog({ open, onClose, weather, hour }: FormulaDialogPro
             Fläche ab. Die Kosten je Quadratmeter sind grobe eigene Annahmen.
           </p>
 
+          <h3>8. Bilderkennung der Flächen</h3>
+          <Formula>Grünheit = (2·G − R − B) / (R + G + B)</Formula>
+          <p>
+            Das amtliche Luftbild (20 cm je Bildpunkt) wird in Zellen von 2 m × 2 m geteilt. Je
+            Zelle werden mittlere Farbe, Helligkeit, Rauheit (Streuung der Helligkeit) und der
+            Anteil grüner Bildpunkte (Grünheit über 0,06) berechnet. Gebäude, Straßen und
+            Gewässer kommen aus OpenStreetMap. Für alles andere gelten Regeln: über 40 % grüne
+            Bildpunkte = Pflanze, dunkel oder rau = Baum, sonst Rasen; rötlich-gelb = Sand oder
+            Kies; dunkelgrau = Asphalt, hellgrau = Pflaster. Mit markierten Beispielen
+            entscheidet stattdessen ein k-nächste-Nachbarn-Verfahren (k = 5) über standardisierte
+            Merkmale. Die Genauigkeit wird an Prüfpunkten gemessen, die nie zum Lernen dienen.
+          </p>
+
           <h3>Rechenbeispiel: Energieflüsse um {formatHour(hour)} Uhr</h3>
           <p>Freie, unverschattete Fläche mit den aktuellen Wetter-Reglern. Werte in W/m².</p>
           <div className="table-scroll">

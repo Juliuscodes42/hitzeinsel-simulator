@@ -36,6 +36,7 @@ describe('Korrigierte Raster', () => {
       grid,
       guessedShare: 0,
       imageUrl: '',
+      imageAttribution: '',
     } satisfies Place
     expect(placeKey(place)).toBe('53.12346,9.10000,53.20000,9.20000')
     expect(placeKey({ ...place, id: 'ebs-elmshorn' })).toBe('ebs-elmshorn')

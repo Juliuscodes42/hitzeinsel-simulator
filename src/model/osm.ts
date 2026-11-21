@@ -40,10 +40,15 @@ export interface OsmElement {
   members?: { type: string; role: string; geometry?: LatLon[] }[]
 }
 
+/** Woher die Oberfläche einer Zelle stammt. */
+export type CellSource = 'building' | 'street' | 'water' | 'mapped' | 'guessed'
+
 export interface RasterResult {
   grid: CityGrid
   /** Anteil der Zellen, deren Oberfläche nur geschätzt ist (0–1). */
   guessedShare: number
+  /** Herkunft je Zelle, in derselben Reihenfolge wie grid.cells. */
+  sources: CellSource[]
 }
 
 /** Meter pro Breitengrad. */
@@ -73,8 +78,8 @@ interface LineFeature {
   surface: SurfaceType
 }
 
-/** Abtastpunkte je Zellenkante. */
-const SAMPLES = 5
+/** Abstand der Abtastpunkte in Metern (bei 10-m-Zellen 5 × 5 Punkte, bei 2-m-Zellen 1 Punkt). */
+const SAMPLE_SPACING_M = 2
 /** Ab diesem Flächenanteil gilt eine Zelle als Straße, auch ohne Mehrheit. */
 const STREET_SHARE = 0.4
 /** Radius einer Baumkrone um einen einzeln kartierten Baum in Metern. */
@@ -399,8 +404,10 @@ export function rasterizeOsm(
     return 'grass|guessed'
   }
 
+  const SAMPLES = Math.max(1, Math.round(cellSizeM / SAMPLE_SPACING_M))
   let guessedCells = 0
   const cells: GridCell[] = []
+  const sources: CellSource[] = []
   for (let row = 0; row < height; row++) {
     for (let column = 0; column < width; column++) {
       const counts = new Map<string, number>()
@@ -424,6 +431,17 @@ export function rasterizeOsm(
       const [surface, flag] = winner.split('|') as [SurfaceType, string | undefined]
 
       if (flag === 'guessed') guessedCells++
+      sources.push(
+        flag === 'street'
+          ? 'street'
+          : surface === 'roof'
+            ? 'building'
+            : flag === 'guessed'
+              ? 'guessed'
+              : surface === 'water'
+                ? 'water'
+                : 'mapped',
+      )
       cells.push(flag === 'street' ? { surface, mist: false, street: true } : { surface, mist: false })
     }
   }
@@ -431,5 +449,6 @@ export function rasterizeOsm(
   return {
     grid: { width, height, cellSizeM, cells },
     guessedShare: guessedCells / cells.length,
+    sources,
   }
 }

@@ -4,14 +4,13 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   IMAGERY_ATTRIBUTION,
   IMAGERY_TILE_URL,
-  aerialImageUrl,
-  fetchOsm,
   searchPlaces,
   type Place,
   type PlaceHit,
 } from '../data/places.ts'
 import { EXAMPLE_PLACES, type ExamplePlace } from '../data/examplePlaces.ts'
-import { rasterizeOsm, squareAround, type BBox } from '../model/osm.ts'
+import { loadPlace, type PlaceRequest } from '../data/placeLoader.ts'
+import { squareAround, type BBox } from '../model/osm.ts'
 
 interface PlacePickerProps {
   onLoaded: (place: Place) => void
@@ -90,35 +89,32 @@ export function PlacePicker({ onLoaded, onDistrict }: PlacePickerProps) {
     setStatus({ kind: 'idle', text: 'Rahmen bei Bedarf verschieben, dann „Ausschnitt laden".' })
   }
 
+  /** Lädt einen Ort mit Bilderkennung und meldet den Fortschritt. */
+  const load = async (request: PlaceRequest) => {
+    setStatus({ kind: 'busy', text: 'Lade …' })
+    try {
+      const place = await loadPlace(request, (text) => setStatus({ kind: 'busy', text }))
+      setStatus({ kind: 'idle', text: `„${place.name}" geladen.` })
+      onLoaded(place)
+    } catch (error) {
+      setStatus({ kind: 'error', text: String(error instanceof Error ? error.message : error) })
+    }
+  }
+
   const loadExample = (example: ExamplePlace) => {
     map.current?.setView([example.lat, example.lon], 18)
     setPlaceName(example.name)
     setHits([])
-    onLoaded(example)
-    setStatus({ kind: 'idle', text: `Beispielort „${example.name}" geladen.` })
+    void load({ id: example.id, name: example.name, bbox: example.bbox })
   }
 
-  const handleLoad = async () => {
+  const handleLoad = () => {
     const center = map.current?.getCenter()
     if (!center) return
-    setStatus({
-      kind: 'busy',
-      text: 'Lade Daten aus OpenStreetMap … Das kann bis zu einer Minute dauern.',
+    void load({
+      name: placeName || `${center.lat.toFixed(4)}° N, ${center.lng.toFixed(4)}° O`,
+      bbox: squareAround(center.lat, center.lng, AREA_SIZE_M),
     })
-    try {
-      const bbox = squareAround(center.lat, center.lng, AREA_SIZE_M)
-      const { grid, guessedShare } = rasterizeOsm(await fetchOsm(bbox), bbox)
-      onLoaded({
-        name: placeName || `${center.lat.toFixed(4)}° N, ${center.lng.toFixed(4)}° O`,
-        bbox,
-        grid,
-        guessedShare,
-        imageUrl: aerialImageUrl(bbox),
-      })
-      setStatus({ kind: 'idle', text: 'Ausschnitt geladen.' })
-    } catch (error) {
-      setStatus({ kind: 'error', text: String(error instanceof Error ? error.message : error) })
-    }
   }
 
   return (
@@ -126,8 +122,8 @@ export function PlacePicker({ onLoaded, onDistrict }: PlacePickerProps) {
       <section className="choice" aria-labelledby="wahl-beispiel">
         <h3 id="wahl-beispiel">Beispielort nehmen</h3>
         <p className="slider-hint">
-          Vier vorbereitete Orte mit Luftbild und Satellitenmessung. Sie laden sofort und auch
-          ohne Internet.
+          Vier vorbereitete Orte mit Satellitenmessung. Sie laden in wenigen Sekunden. Ohne
+          Internet fehlt das Luftbild, dann rechnet die App nur mit OpenStreetMap.
         </p>
         <div className="choice-cards">
           {EXAMPLE_PLACES.map((example) => (
@@ -135,12 +131,18 @@ export function PlacePicker({ onLoaded, onDistrict }: PlacePickerProps) {
               key={example.id}
               type="button"
               className="choice-card"
+              disabled={status.kind === 'busy'}
               onClick={() => loadExample(example)}
             >
               {example.name}
             </button>
           ))}
         </div>
+        {!searchOpen && status.kind !== 'idle' && (
+          <p className={`place-status${status.kind === 'error' ? ' is-error' : ''}`} role="status">
+            {status.text}
+          </p>
+        )}
       </section>
 
       <details

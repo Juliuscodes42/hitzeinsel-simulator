@@ -14,7 +14,15 @@ interface BrushPaletteProps {
   /** Anzahl der von Hand veränderten Zellen. */
   paintedCount: number
   onClear: () => void
+  /** Pinselgröße in Zellen (Radius); fehlt bei groben Rastern. */
+  size?: number
+  onSizeChange?: (size: number) => void
+  /** Kantenlänge einer Zelle in Metern, für die Beschriftung der Pinselgröße. */
+  cellSizeM?: number
 }
+
+/** Wählbare Pinselgrößen als Radius in Zellen. */
+const BRUSH_SIZES = [0, 1, 2, 4]
 
 const isSurface = (brush: Brush, surface: SurfaceType): boolean =>
   brush?.kind === 'surface' && brush.surface === surface
@@ -23,9 +31,34 @@ const isSurface = (brush: Brush, surface: SurfaceType): boolean =>
  * Auswahl des Pinsels. Die Farbfelder dienen zugleich als Legende
  * für die Flächenansicht.
  */
-export function BrushPalette({ brush, onChange, paintedCount, onClear }: BrushPaletteProps) {
+export function BrushPalette({
+  brush,
+  onChange,
+  paintedCount,
+  onClear,
+  size,
+  onSizeChange,
+  cellSizeM = 10,
+}: BrushPaletteProps) {
   return (
     <div className="palette">
+      {size !== undefined && onSizeChange && (
+        <div className="brush-size">
+          <span>Pinselgröße</span>
+          <div className="toggle" role="group" aria-label="Pinselgröße">
+            {BRUSH_SIZES.map((radius) => (
+              <button
+                key={radius}
+                type="button"
+                aria-pressed={size === radius}
+                onClick={() => onSizeChange(radius)}
+              >
+                {(2 * radius + 1) * cellSizeM} m
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="palette-swatches" role="group" aria-label="Pinsel wählen">
         <button
           type="button"

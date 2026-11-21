@@ -9,7 +9,7 @@ import type { CityGrid } from '../model/grid.ts'
 import type { LandsatScene } from '../model/validation.ts'
 import raw from './examplePlaces.json'
 import type { SurfaceType } from './materials.ts'
-import { aerialImageUrl, type Place } from './places.ts'
+import { IMAGERY_ATTRIBUTION, aerialImageUrl, type Place } from './places.ts'
 
 export interface ExamplePlace extends Place {
   id: string
@@ -40,6 +40,7 @@ export const EXAMPLE_PLACES: ExamplePlace[] = raw.places.map((place) => {
     grid,
     guessedShare: place.guessedShare,
     imageUrl: aerialImageUrl(place.bbox),
+    imageAttribution: IMAGERY_ATTRIBUTION,
     scenes: place.scenes,
   }
 })

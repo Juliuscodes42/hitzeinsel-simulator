@@ -32,8 +32,12 @@ export interface CityGrid {
   cells: GridCell[]
 }
 
-/** Umkreis in Zellen, in dem Gebäude eine Bodenzelle beeinflussen. */
-const NEIGHBOURHOOD_RADIUS = 2
+/**
+ * Umkreis in Metern, in dem Gebäude eine Bodenzelle beeinflussen.
+ * Bei 10-m-Zellen sind das 2 Zellen in jede Richtung (Fenster 5 × 5),
+ * bei 2-m-Zellen 10 Zellen (Fenster 21 × 21).
+ */
+const NEIGHBOURHOOD_RADIUS_M = 20
 /** Die Bebauungsdichte wird auf solche Stufen gerundet (spart Rechenzeit). */
 const DENSITY_STEP = 0.05
 
@@ -60,21 +64,54 @@ export function createUniformGrid(
   }
 }
 
-/** Anteil der Gebäudezellen in der Umgebung einer Zelle (0–1). */
+const neighbourhoodRadius = (grid: CityGrid): number =>
+  Math.max(1, Math.round(NEIGHBOURHOOD_RADIUS_M / grid.cellSizeM))
+
+/** Anteil der Gebäudezellen in der Umgebung einer Zelle (0–1), ohne die Zelle selbst. */
 export function localBuildingDensity(grid: CityGrid, x: number, y: number): number {
-  let buildings = 0
-  let total = 0
-  for (let dy = -NEIGHBOURHOOD_RADIUS; dy <= NEIGHBOURHOOD_RADIUS; dy++) {
-    for (let dx = -NEIGHBOURHOOD_RADIUS; dx <= NEIGHBOURHOOD_RADIUS; dx++) {
-      const nx = x + dx
-      const ny = y + dy
-      const isSelf = dx === 0 && dy === 0
-      if (isSelf || nx < 0 || ny < 0 || nx >= grid.width || ny >= grid.height) continue
-      total++
-      if (MATERIALS[grid.cells[ny * grid.width + nx].surface].isRoof) buildings++
+  return buildingDensities(grid)[y * grid.width + x]
+}
+
+const densityCache = new WeakMap<CityGrid, Float32Array>()
+
+/**
+ * Bebauungsdichte für alle Zellen auf einmal. Eine Summentabelle
+ * (Summe aller Gebäudezellen links oberhalb) macht jedes Fenster zu vier
+ * Nachschlägen, auch bei großen Fenstern.
+ */
+export function buildingDensities(grid: CityGrid): Float32Array {
+  const cached = densityCache.get(grid)
+  if (cached) return cached
+  const { width, height } = grid
+  const radius = neighbourhoodRadius(grid)
+  const sums = new Int32Array((width + 1) * (height + 1))
+  for (let y = 0; y < height; y++) {
+    let rowSum = 0
+    for (let x = 0; x < width; x++) {
+      rowSum += MATERIALS[grid.cells[y * width + x].surface].isRoof ? 1 : 0
+      sums[(y + 1) * (width + 1) + x + 1] = sums[y * (width + 1) + x + 1] + rowSum
     }
   }
-  return total === 0 ? 0 : buildings / total
+  const sumIn = (x0: number, y0: number, x1: number, y1: number) =>
+    sums[y1 * (width + 1) + x1] -
+    sums[y0 * (width + 1) + x1] -
+    sums[y1 * (width + 1) + x0] +
+    sums[y0 * (width + 1) + x0]
+
+  const densities = new Float32Array(width * height)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const x0 = Math.max(0, x - radius)
+      const y0 = Math.max(0, y - radius)
+      const x1 = Math.min(width, x + radius + 1)
+      const y1 = Math.min(height, y + radius + 1)
+      const self = MATERIALS[grid.cells[y * width + x].surface].isRoof ? 1 : 0
+      const total = (x1 - x0) * (y1 - y0) - 1
+      densities[y * width + x] = total <= 0 ? 0 : (sumIn(x0, y0, x1, y1) - self) / total
+    }
+  }
+  densityCache.set(grid, densities)
+  return densities
 }
 
 /** Leitet aus Zelle und Bebauungsdichte die Bedingungen für die Energiebilanz ab. */
@@ -101,7 +138,7 @@ export function conditionsAt(
   cell: GridCell = grid.cells[index],
 ): CellConditions {
   if (MATERIALS[cell.surface].isRoof) return conditionsFor(cell, 0)
-  const density = localBuildingDensity(grid, index % grid.width, Math.floor(index / grid.width))
+  const density = buildingDensities(grid)[index]
   return conditionsFor(cell, Math.round(density / DENSITY_STEP) * DENSITY_STEP)
 }
 

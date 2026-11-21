@@ -84,9 +84,7 @@ export function OptimizerPanel({ grid, weather, onApply }: OptimizerPanelProps) 
         <>
           <p className="optimizer-result">
             Mit <b>{formatEuro(proposal.totalCost)}</b> lassen sich{' '}
-            <b>
-              {proposal.actions.length} Flächen ({formatNumber(proposal.actions.length * cellArea, 0)} m²)
-            </b>{' '}
+            <b>{formatNumber(proposal.actions.length * cellArea, 0)} m²</b>{' '}
             umbauen. Das kühlt das Viertel im Ziel „{GOAL_LABELS[goal]}" um{' '}
             <b>{formatNumber(proposal.coolingK, 2)} °C</b>. Am meisten trägt{' '}
             <b>{ACTION_LABELS[used[0]]}</b> bei.
@@ -97,7 +95,7 @@ export function OptimizerPanel({ grid, weather, onApply }: OptimizerPanelProps) 
               <thead>
                 <tr>
                   <th scope="col">Maßnahme</th>
-                  <th scope="col">Flächen</th>
+                  <th scope="col">Fläche</th>
                   <th scope="col">Kosten</th>
                   <th scope="col">Kühlung</th>
                   <th scope="col">je 100.000 €</th>
@@ -109,7 +107,7 @@ export function OptimizerPanel({ grid, weather, onApply }: OptimizerPanelProps) 
                   return (
                     <tr key={kind}>
                       <th scope="row">{ACTION_LABELS[kind]}</th>
-                      <td>{summary.count}</td>
+                      <td>{formatNumber(summary.count * cellArea, 0)} m²</td>
                       <td>{formatEuro(summary.cost)}</td>
                       <td>{formatNumber(summary.coolingK, 2)} °C</td>
                       <td>{formatNumber((summary.coolingK / summary.cost) * 100_000, 2)} °C</td>

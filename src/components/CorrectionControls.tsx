@@ -63,8 +63,8 @@ export function CorrectionControls({
               isBundled(placeKey) ? ' (fest im Projekt hinterlegt)' : ' (nur auf diesem Gerät)'
             }.`
           : 'Dieser Ort zeigt das unveränderte Raster aus OpenStreetMap.'}{' '}
-        Vorgehen: Deckkraft senken, falsche Zellen mit dem Pinsel nachzeichnen, dann speichern.
-        Die Maßnahmen-Regler werden nicht mitgespeichert.
+        Vorgehen: falsche Flächen mit dem Pinsel nachzeichnen, dann speichern. Umbauten aus dem
+        Schritt „Maßnahmen" werden nicht mitgespeichert.
       </p>
       <div className="corrections-buttons">
         <button

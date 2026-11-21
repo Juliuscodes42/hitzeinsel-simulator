@@ -6,10 +6,12 @@
  */
 
 import type { CityGrid } from '../model/grid.ts'
-import type { BBox, OsmElement } from '../model/osm.ts'
+import type { BBox, CellSource, OsmElement } from '../model/osm.ts'
 
 /** Ein aus echten Daten geladener Ausschnitt. */
 export interface Place {
+  /** Kennung der fest eingebauten Beispielorte. */
+  id?: string
   name: string
   bbox: BBox
   grid: CityGrid
@@ -17,6 +19,21 @@ export interface Place {
   guessedShare: number
   /** Adresse des Luftbilds für genau diesen Ausschnitt. */
   imageUrl: string
+  /** Quellenvermerk des Luftbilds. */
+  imageAttribution: string
+  /** Grundlagen der Bilderkennung; fehlt, wenn kein auswertbares Luftbild geladen wurde. */
+  recognition?: RecognitionInput
+  /** Hinweis, falls etwas nicht geklappt hat (z. B. Luftbild nicht erreichbar). */
+  notice?: string
+}
+
+/** Was die Bilderkennung braucht, um mit Beispielpunkten neu zu rechnen. */
+export interface RecognitionInput {
+  /** Raster aus OpenStreetMap in derselben Auflösung. */
+  prior: CityGrid
+  sources: CellSource[]
+  /** Merkmale je Zelle aus dem Luftbild. */
+  features: Float32Array
 }
 
 /* ---------- Ortssuche (Nominatim, OpenStreetMap) ---------- */

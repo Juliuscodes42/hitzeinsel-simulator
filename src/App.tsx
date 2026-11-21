@@ -16,7 +16,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { DEFAULT_ALIGNMENT } from './components/alignment.ts'
 import { BackgroundControls } from './components/BackgroundControls.tsx'
 import { BrushPalette, type Brush } from './components/BrushPalette.tsx'
-import { CityGridView, type ViewMode } from './components/CityGridView.tsx'
+import { CityGridView, type GridMarker, type ViewMode } from './components/CityGridView.tsx'
 import { CorrectionControls } from './components/CorrectionControls.tsx'
 import { DayChart } from './components/DayChart.tsx'
 import { DistrictControls } from './components/DistrictControls.tsx'
@@ -31,6 +31,7 @@ import {
 } from './components/format.ts'
 import { FormulaDialog } from './components/FormulaDialog.tsx'
 import { MeasureControls } from './components/MeasureControls.tsx'
+import { RecognitionPanel, type MarkingTool } from './components/RecognitionPanel.tsx'
 import { OptimizerPanel } from './components/OptimizerPanel.tsx'
 import { PlacePicker } from './components/PlacePicker.tsx'
 import { Slider } from './components/Slider.tsx'
@@ -51,7 +52,14 @@ import {
 import { MATERIALS } from './data/materials.ts'
 import { loadRegionalWeather, type RegionalWeather } from './data/regionalWeather.ts'
 import { DEFAULT_LOCATION } from './data/weatherService.ts'
-import { IMAGERY_ATTRIBUTION, OSM_ATTRIBUTION, type Place } from './data/places.ts'
+import { OSM_ATTRIBUTION, type Place } from './data/places.ts'
+import {
+  NO_POINTS,
+  loadPoints,
+  storePoints,
+  withPoint,
+  type PlacePoints,
+} from './data/recognitionPoints.ts'
 import { DEFAULT_WEATHER, airTemperatureC, daylight } from './model/atmosphere.ts'
 import {
   NO_MEASURES,
@@ -64,6 +72,8 @@ import {
 } from './model/district.ts'
 import { surfaceTempAt } from './model/energyBalance.ts'
 import type { ReturnPeriod } from './model/heavyRain.ts'
+import { measureAccuracy, trainClassifier } from './model/learning.ts'
+import { recognize } from './model/recognition.ts'
 import {
   meanAlbedo,
   meanDailyCurve,
@@ -101,8 +111,14 @@ export default function App() {
   const [weather, setWeather] = useState(DEFAULT_WEATHER)
   const [district, setDistrict] = useState(DEFAULT_DISTRICT)
   const [measures, setMeasures] = useState(NO_MEASURES)
+  // Von Hand gemalte Zellen: Korrekturen am Ist-Zustand (Schritt 2) und Umbauten (Schritt 3)
+  const [fixes, setFixes] = useState(NO_OVERRIDES)
   const [overrides, setOverrides] = useState(NO_OVERRIDES)
   const [brush, setBrush] = useState<Brush>(null)
+  const [brushSize, setBrushSize] = useState(1)
+  // Bilderkennung: Beispiel- und Prüfpunkte je Ort, gerade gewähltes Markierwerkzeug
+  const [allPoints, setAllPoints] = useState<Record<string, PlacePoints>>(loadPoints)
+  const [marking, setMarking] = useState<MarkingTool | null>(null)
   const [hour, setHour] = useState(15)
   const [view, setView] = useState<ViewMode>('temperature')
   const [inspected, setInspected] = useState<number | null>(null)
@@ -132,19 +148,67 @@ export default function App() {
   const activeKey = activePlace ? placeKey(activePlace) : null
   const activeCorrection = activeKey ? corrections[activeKey] : undefined
   // Ist-Zustand: echter Ort (mit Korrektur, falls gespeichert) oder Beispielviertel.
+  const points = (activeKey && allPoints[activeKey]) || NO_POINTS
+  const recognition = activePlace?.recognition
+  // Gelerntes Verfahren aus den Beispielpunkten (null = zu wenige Beispiele).
+  const classifier = useMemo(
+    () => (recognition ? trainClassifier(recognition.features, points.training) : null),
+    [recognition, points.training],
+  )
+  // Erkanntes Raster: mit gelerntem Verfahren, sonst das Ergebnis der Regeln.
+  const recognizedGrid = useMemo(() => {
+    if (!activePlace) return null
+    if (!recognition || !classifier) return activePlace.grid
+    return recognize(recognition.prior, recognition.sources, recognition.features, classifier).grid
+  }, [activePlace, recognition, classifier])
+
+  // Ist-Zustand: echter Ort (mit Korrektur, falls gespeichert) oder Beispielviertel.
+  // Dazu kommen die gerade gemalten, noch nicht gespeicherten Korrekturen.
   const baseGrid = useMemo(
     () =>
-      activePlace
-        ? applyCorrection(activePlace.grid, activeCorrection)
-        : generateDistrict(liveDistrict),
-    [activePlace, activeCorrection, liveDistrict],
+      applyOverrides(
+        recognizedGrid
+          ? applyCorrection(recognizedGrid, activeCorrection)
+          : generateDistrict(liveDistrict),
+        fixes,
+      ),
+    [recognizedGrid, activeCorrection, liveDistrict, fixes],
+  )
+
+  /** Ändert die Punkte des aktuellen Orts und speichert sie auf dem Gerät. */
+  const updatePoints = (change: (current: PlacePoints) => PlacePoints) => {
+    if (!activeKey) return
+    setAllPoints((previous) => {
+      const next = { ...previous, [activeKey]: change(previous[activeKey] ?? NO_POINTS) }
+      storePoints(next)
+      return next
+    })
+  }
+
+  // Genauigkeit an den Prüfpunkten: OSM allein, Regeln, gelerntes Verfahren.
+  const accuracy = useMemo(() => {
+    if (!recognition || !activePlace) return null
+    const rules = recognize(recognition.prior, recognition.sources, recognition.features).grid
+    return {
+      osm: measureAccuracy(recognition.prior, points.checks),
+      rules: measureAccuracy(rules, points.checks),
+      learned: classifier && recognizedGrid ? measureAccuracy(recognizedGrid, points.checks) : null,
+    }
+  }, [recognition, activePlace, classifier, recognizedGrid, points.checks])
+
+  const markers = useMemo<GridMarker[]>(
+    () => [
+      ...points.training.map((point) => ({ ...point, kind: 'training' as const })),
+      ...points.checks.map((point) => ({ ...point, kind: 'check' as const })),
+    ],
+    [points],
   )
 
   /** Übernimmt geänderte Korrekturen und merkt sie sich auf diesem Gerät. */
   const updateCorrections = (next: Corrections) => {
     setCorrections(next)
     storeCorrections(next)
-    setOverrides(NO_OVERRIDES)
+    setFixes(NO_OVERRIDES)
   }
   const ranks = useMemo(
     () => cellRanks(liveDistrict.seed, baseGrid.cells.length),
@@ -162,27 +226,57 @@ export default function App() {
   const curve = useMemo(() => meanDailyCurve(result), [result])
   const { sunrise, sunset } = useMemo(() => daylight(liveWeather), [liveWeather])
 
+  // Bei feinen Rastern malt der Pinsel einen Kreis aus mehreren Zellen.
+  const paintRadius = grid.width > 30 ? brushSize : 0
   const paint = useCallback(
     (index: number) => {
       if (!brush) return
-      setOverrides((previous) => {
-        const current = grid.cells[index]
-        const next = new Map(previous)
-        if (brush.kind === 'erase') {
-          if (!previous.has(index)) return previous
-          next.delete(index)
-        } else if (brush.kind === 'mist') {
-          if (current.mist) return previous
-          next.set(index, { ...current, mist: true })
-        } else {
-          if (current.surface === brush.surface && !current.mist) return previous
-          next.set(index, { surface: brush.surface, mist: false })
+      const cx = index % grid.width
+      const cy = Math.floor(index / grid.width)
+      const targets: number[] = []
+      for (let dy = -paintRadius; dy <= paintRadius; dy++) {
+        for (let dx = -paintRadius; dx <= paintRadius; dx++) {
+          const x = cx + dx
+          const y = cy + dy
+          if (dx * dx + dy * dy > paintRadius * paintRadius + paintRadius) continue
+          if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) continue
+          targets.push(y * grid.width + x)
         }
-        return next
+      }
+      // In der Ausgangslage wird der Ist-Zustand korrigiert, danach umgebaut.
+      const correcting = step === 1
+      const cells = correcting ? baseGrid.cells : grid.cells
+      ;(correcting ? setFixes : setOverrides)((previous) => {
+        const next = new Map(previous)
+        let changed = false
+        for (const target of targets) {
+          const current = cells[target]
+          if (brush.kind === 'erase') {
+            changed = next.delete(target) || changed
+          } else if (brush.kind === 'mist') {
+            if (current.mist) continue
+            next.set(target, { ...current, mist: true })
+            changed = true
+          } else {
+            if (current.surface === brush.surface && !current.mist) continue
+            next.set(target, { surface: brush.surface, mist: false })
+            changed = true
+          }
+        }
+        return changed ? next : previous
       })
     },
-    [brush, grid],
+    [brush, grid, baseGrid, paintRadius, step],
   )
+
+  /** Klick ins Raster: markieren (Bilderkennung) oder malen. */
+  const handleGridPaint = (index: number) => {
+    if (marking) {
+      updatePoints((current) => withPoint(current, marking.set, index, marking.surface))
+      return
+    }
+    paint(index)
+  }
 
   // Adresse des hochgeladenen Bilds wieder freigeben, wenn es ersetzt wird.
   useEffect(() => {
@@ -263,6 +357,7 @@ export default function App() {
   const goTo = (next: number, hasImage = background !== null) => {
     setStep(next)
     setBrush(null)
+    setMarking(null)
     // Ausgangslage: erkannte Flächen. Maßnahmen: Umbauten auf dem Luftbild. Ergebnis: Temperatur.
     if (next === 1) setView('surface')
     if (next === 2) setView(hasImage ? 'aerial' : 'temperature')
@@ -310,6 +405,7 @@ export default function App() {
               onLoaded={(loaded) => {
                 setPlace(loaded)
                 setMode('place')
+                setFixes(NO_OVERRIDES)
                 setOverrides(NO_OVERRIDES)
                 setMeasures(NO_MEASURES)
                 setCustomImage(null)
@@ -317,6 +413,7 @@ export default function App() {
               }}
               onDistrict={() => {
                 if (mode !== 'example') {
+                  setFixes(NO_OVERRIDES)
                   setOverrides(NO_OVERRIDES)
                   setMeasures(NO_MEASURES)
                 }
@@ -369,9 +466,10 @@ export default function App() {
                 baseCells={baseGrid.cells}
                 background={background}
                 cellOpacity={cellOpacity}
-                painting={brush !== null}
-                onPaint={paint}
+                painting={brush !== null || marking !== null}
+                onPaint={handleGridPaint}
                 onInspect={setInspected}
+                markers={step === 1 ? markers : undefined}
               />
 
               <p className="inspect" aria-live="polite">
@@ -381,7 +479,7 @@ export default function App() {
                     }: ${formatTemp(surfaceTempAt(result.cells[inspected], hour))} um ${formatHour(
                       hour,
                     )} Uhr, Tageshöchstwert ${formatTemp(result.cells[inspected].maxC)}`
-                  : 'Zelle berühren, um Werte zu sehen. Eine Zelle ist 10 m × 10 m groß.'}
+                  : `Zelle berühren, um Werte zu sehen. Eine Zelle ist ${grid.cellSizeM} m × ${grid.cellSizeM} m groß.`}
               </p>
 
               {shownView === 'aerial' && (
@@ -423,7 +521,9 @@ export default function App() {
 
               {activePlace && (
                 <p className="attribution">
-                  {customImage ? OSM_ATTRIBUTION : `${IMAGERY_ATTRIBUTION} · ${OSM_ATTRIBUTION}`}
+                  {customImage
+                    ? OSM_ATTRIBUTION
+                    : `${activePlace.imageAttribution} · ${OSM_ATTRIBUTION}`}
                 </p>
               )}
             </section>
@@ -456,35 +556,80 @@ export default function App() {
                     </div>
                   </div>
 
+                  {activePlace?.notice && <p className="slider-hint is-error">{activePlace.notice}</p>}
+                  {activePlace && recognition && (
+                    <p className="slider-hint">
+                      Die Flächen wurden im Luftbild erkannt: Gebäude, Straßen und Gewässer aus
+                      OpenStreetMap, Pflanzen, Sand und Beläge aus den Farben. Eine Zelle ist 2 m ×
+                      2 m groß.
+                    </p>
+                  )}
+
+                  {activePlace && recognition && accuracy && (
+                    <Fold
+                      title="Erkennung prüfen und verbessern"
+                      note={
+                        accuracy.learned && points.checks.length >= 10
+                          ? `${formatPercent(accuracy.learned.share)} richtig`
+                          : points.checks.length >= 10
+                            ? `${formatPercent(accuracy.rules.share)} richtig`
+                            : `${formatPercent(activePlace.guessedShare)} unsicher`
+                      }
+                      onToggle={(open) => {
+                        if (!open) setMarking(null)
+                        else setBrush(null)
+                      }}
+                    >
+                      <RecognitionPanel
+                        points={points}
+                        tool={marking}
+                        onToolChange={(tool) => {
+                          setMarking(tool)
+                          if (tool) setBrush(null)
+                        }}
+                        onClear={(set) => updatePoints((current) => ({ ...current, [set]: [] }))}
+                        accuracy={accuracy}
+                        learning={classifier !== null}
+                      />
+                    </Fold>
+                  )}
+
                   {activePlace ? (
                     <Fold
-                      title="Flächen korrigieren"
-                      note={`${formatPercent(activePlace.guessedShare)} geschätzt`}
+                      title="Flächen von Hand korrigieren"
+                      note={fixes.size > 0 ? `${fixes.size} Zellen geändert` : 'mit dem Pinsel'}
                       onToggle={(open) => {
                         if (!open) setBrush(null)
+                        else setMarking(null)
                       }}
                     >
                       <p className="slider-hint">
-                        OpenStreetMap kennt nicht jede Fläche. Wo das Raster nicht zum Luftbild
-                        passt: Pinsel wählen, Zellen nachzeichnen und als Korrektur speichern.
+                        Wo das Raster trotzdem nicht zum Luftbild passt: Pinsel wählen, Flächen
+                        nachzeichnen und als Korrektur speichern.
                       </p>
                       <BrushPalette
                         brush={brush}
-                        onChange={setBrush}
-                        paintedCount={overrides.size}
-                        onClear={() => setOverrides(NO_OVERRIDES)}
+                        onChange={(next) => {
+                          setBrush(next)
+                          if (next) setMarking(null)
+                        }}
+                        paintedCount={fixes.size}
+                        onClear={() => setFixes(NO_OVERRIDES)}
+                        size={baseGrid.width > 30 ? brushSize : undefined}
+                        onSizeChange={setBrushSize}
+                        cellSizeM={baseGrid.cellSizeM}
                       />
                       {activeKey && (
                         <CorrectionControls
                           placeKey={activeKey}
                           corrections={corrections}
-                          hasUnsavedChanges={overrides.size > 0}
+                          hasUnsavedChanges={fixes.size > 0}
                           onSave={() =>
                             updateCorrections({
                               ...corrections,
                               // Gespeichert wird das Raster ohne Regler-Maßnahmen, nur mit gemalten Zellen.
                               [activeKey]: correctionFromGrid(
-                                applyOverrides(baseGrid, overrides),
+                                baseGrid,
                                 new Date().toISOString().slice(0, 10),
                               ),
                             })
@@ -503,7 +648,10 @@ export default function App() {
                         district={district}
                         onDistrictChange={(next) => {
                           // Ein neu gewürfeltes Viertel passt nicht mehr zu den gemalten Zellen.
-                          if (next.seed !== district.seed) setOverrides(NO_OVERRIDES)
+                          if (next.seed !== district.seed) {
+                            setFixes(NO_OVERRIDES)
+                            setOverrides(NO_OVERRIDES)
+                          }
                           setDistrict(next)
                         }}
                       />
@@ -542,10 +690,10 @@ export default function App() {
                     />
                   </Fold>
 
-                  {activePlace && overrides.size > 0 && (
+                  {activePlace && fixes.size > 0 && (
                     <p className="slider-hint">
-                      Hinweis: {overrides.size} gemalte Zellen sind noch nicht als Korrektur
-                      gespeichert. Ohne Speichern zählen sie im nächsten Schritt als Umbau.
+                      Hinweis: {fixes.size} korrigierte Zellen sind noch nicht gespeichert. Sie
+                      gelten, bis die Seite neu geladen wird.
                     </p>
                   )}
                 </>
@@ -615,6 +763,9 @@ export default function App() {
                       onChange={setBrush}
                       paintedCount={overrides.size}
                       onClear={() => setOverrides(NO_OVERRIDES)}
+                      size={baseGrid.width > 30 ? brushSize : undefined}
+                      onSizeChange={setBrushSize}
+                      cellSizeM={baseGrid.cellSizeM}
                     />
                   </Fold>
                 </>
