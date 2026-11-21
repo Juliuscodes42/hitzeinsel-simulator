@@ -18,6 +18,7 @@ import { BackgroundControls } from './components/BackgroundControls.tsx'
 import { BrushPalette, type Brush } from './components/BrushPalette.tsx'
 import { CityGridView, type GridMarker, type ViewMode } from './components/CityGridView.tsx'
 import { CorrectionControls } from './components/CorrectionControls.tsx'
+import { describeCell } from './components/cellText.ts'
 import { DayChart } from './components/DayChart.tsx'
 import { DistrictControls } from './components/DistrictControls.tsx'
 import { Fold } from './components/Fold.tsx'
@@ -49,7 +50,7 @@ import {
   storeCorrections,
   type Corrections,
 } from './data/corrections.ts'
-import { MATERIALS } from './data/materials.ts'
+import { MEASURE_BY_ID, canApply } from './data/measures.ts'
 import { loadRegionalWeather, type RegionalWeather } from './data/regionalWeather.ts'
 import { DEFAULT_LOCATION } from './data/weatherService.ts'
 import { OSM_ATTRIBUTION, type Place } from './data/places.ts'
@@ -211,8 +212,8 @@ export default function App() {
     setFixes(NO_OVERRIDES)
   }
   const ranks = useMemo(
-    () => cellRanks(liveDistrict.seed, baseGrid.cells.length),
-    [liveDistrict.seed, baseGrid.cells.length],
+    () => cellRanks(liveDistrict.seed, baseGrid.cells.length, baseGrid.width, baseGrid.cellSizeM),
+    [liveDistrict.seed, baseGrid.cells.length, baseGrid.width, baseGrid.cellSizeM],
   )
   // Soll-Zustand: mit Maßnahmen und von Hand gemalten Zellen.
   const grid = useMemo(
@@ -253,9 +254,14 @@ export default function App() {
           const current = cells[target]
           if (brush.kind === 'erase') {
             changed = next.delete(target) || changed
-          } else if (brush.kind === 'mist') {
-            if (current.mist) continue
-            next.set(target, { ...current, mist: true })
+          } else if (brush.kind === 'measure') {
+            // Maßnahmen, die die Fläche ersetzen, gehen vom Ist-Zustand aus; so lässt
+            // sich eine Maßnahme durch eine andere übermalen. Zusätzliche Maßnahmen
+            // (Sprühnebel, Zisterne) kommen auf das, was schon da ist.
+            const measure = MEASURE_BY_ID[brush.measure]
+            const start = measure.exclusive ? baseGrid.cells[target] : (next.get(target) ?? current)
+            if (!canApply(start, measure) || next.get(target)?.measure === measure.id) continue
+            next.set(target, measure.apply(start))
             changed = true
           } else {
             if (current.surface === brush.surface && !current.mist) continue
@@ -474,9 +480,7 @@ export default function App() {
 
               <p className="inspect" aria-live="polite">
                 {inspected !== null && inspectedCell
-                  ? `${MATERIALS[inspectedCell.surface].label}${
-                      inspectedCell.mist ? ' mit Sprühnebel' : ''
-                    }: ${formatTemp(surfaceTempAt(result.cells[inspected], hour))} um ${formatHour(
+                  ? `${describeCell(inspectedCell)}: ${formatTemp(surfaceTempAt(result.cells[inspected], hour))} um ${formatHour(
                       hour,
                     )} Uhr, Tageshöchstwert ${formatTemp(result.cells[inspected].maxC)}`
                   : `Zelle berühren, um Werte zu sehen. Eine Zelle ist ${grid.cellSizeM} m × ${grid.cellSizeM} m groß.`}
@@ -608,6 +612,7 @@ export default function App() {
                         nachzeichnen und als Korrektur speichern.
                       </p>
                       <BrushPalette
+                        mode="surfaces"
                         brush={brush}
                         onChange={(next) => {
                           setBrush(next)
@@ -759,6 +764,7 @@ export default function App() {
                     }}
                   >
                     <BrushPalette
+                      mode="measures"
                       brush={brush}
                       onChange={setBrush}
                       paintedCount={overrides.size}

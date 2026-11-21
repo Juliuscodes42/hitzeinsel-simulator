@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 import type { SurfaceType } from '../data/materials.ts'
 import { surfaceTempAt } from '../model/energyBalance.ts'
 import type { CityGrid, GridCell, GridResult } from '../model/grid.ts'
-import { SURFACE_COLORS, temperatureColor } from './colors.ts'
+import { COVER_COLORS, SURFACE_COLORS, temperatureColor } from './colors.ts'
 
 /**
  * Ansichten des Rasters:
@@ -89,7 +89,12 @@ export function CityGridView({
     for (let index = 0; index < cells.length; index++) {
       const cell = cells[index]
       const base = baseCells[index]
-      const changed = !base || base.surface !== cell.surface || base.mist !== cell.mist
+      const changed =
+        !base ||
+        base.surface !== cell.surface ||
+        base.mist !== cell.mist ||
+        base.cover !== cell.cover ||
+        base.cistern !== cell.cistern
       if (view === 'aerial' && !changed) continue
       context.fillStyle =
         view === 'temperature'
@@ -119,6 +124,41 @@ export function CityGridView({
         context.lineTo(CANVAS_SIZE, i * ch)
       }
       context.stroke()
+    }
+
+    // Solardächer und Sonnensegel: halb durchsichtige Fläche mit Streifen darüber
+    // (in der Temperaturansicht nicht, dort zählt der Boden darunter).
+    if (view !== 'temperature') {
+      for (let index = 0; index < cells.length; index++) {
+        const cover = cells[index].cover
+        if (!cover) continue
+        const x0 = Math.round((index % width) * cw)
+        const y0 = Math.round(Math.floor(index / width) * ch)
+        const w = Math.round(((index % width) + 1) * cw) - x0
+        const h = Math.round((Math.floor(index / width) + 1) * ch) - y0
+        context.globalAlpha = 0.75
+        context.fillStyle = COVER_COLORS[cover]
+        context.fillRect(x0, y0, w, h)
+        context.globalAlpha = 1
+        if ((index % width) % 2 === 0) {
+          context.fillStyle = cover === 'pv' ? '#6f8fc9' : '#c9b070'
+          context.fillRect(x0, y0, Math.max(1, w / 4), h)
+        }
+      }
+    }
+
+    // Zisternen: kleines blaues Quadrat auf dem Dach.
+    context.fillStyle = '#2f6fb3'
+    for (let index = 0; index < cells.length; index++) {
+      if (!cells[index].cistern) continue
+      if (cw < 8 && ((index % width) % 3 !== 1 || Math.floor(index / width) % 3 !== 1)) continue
+      const size = Math.max(3, Math.min(cw, ch) * 0.35)
+      context.fillRect(
+        ((index % width) + 0.5) * cw - size / 2,
+        (Math.floor(index / width) + 0.5) * ch - size / 2,
+        size,
+        size,
+      )
     }
 
     // Sprühnebel: heller Punkt in der Zellenmitte.

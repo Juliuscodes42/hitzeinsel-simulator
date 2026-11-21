@@ -6,6 +6,7 @@
  */
 
 import { MATERIALS } from '../data/materials.ts'
+import { MEASURES, MEASURE_BY_ID, fitsTarget, type MeasureId } from '../data/measures.ts'
 import type { CityGrid, GridCell } from './grid.ts'
 
 export interface DistrictParams {
@@ -17,27 +18,15 @@ export interface DistrictParams {
   seed: number
 }
 
-/** Anteil der jeweils geeigneten Flächen, auf denen eine Maßnahme umgesetzt wird (0–1). */
-export interface Measures {
-  /** Dachbegrünung: dunkles Dach wird Gründach. */
-  greenRoofs: number
-  /** Cool Roofs: dunkles Dach wird hell gestrichen. */
-  coolRoofs: number
-  /** Laubbäume auf versiegelten Höfen, Plätzen und Parkplätzen. */
-  trees: number
-  /** Entsiegelung: Pflaster und Parkplatz-Asphalt werden Rasengitter. */
-  unsealing: number
-  /** Sprühnebel auf Straßen und Plätzen. */
-  mist: number
-}
+/**
+ * Anteil der jeweils geeigneten Flächen, auf denen eine Maßnahme umgesetzt
+ * wird (0–1), für jede Maßnahme aus dem Katalog (src/data/measures.ts).
+ */
+export type Measures = Record<MeasureId, number>
 
-export const NO_MEASURES: Measures = {
-  greenRoofs: 0,
-  coolRoofs: 0,
-  trees: 0,
-  unsealing: 0,
-  mist: 0,
-}
+export const NO_MEASURES: Measures = Object.fromEntries(
+  MEASURES.map((measure) => [measure.id, 0]),
+) as Measures
 
 /** Alle so viele Zellen verläuft eine Straße. */
 const STREET_SPACING = 7
@@ -107,37 +96,69 @@ export function generateDistrict(
  * Maßnahmen Flächen erfassen: 30 % Dachbegrünung trifft immer dieselben
  * Dächer, 60 % dieselben plus weitere.
  */
-export function cellRanks(seed: number, count: number): number[] {
-  return randomList(createRandom(seed ^ 0x9e3779b9), count)
+export function cellRanks(seed: number, count: number, width = count, cellSizeM = 10): number[] {
+  const random = createRandom(seed ^ 0x9e3779b9)
+  // Bei feinen Rastern bekommen Flecken von etwa 10 m × 10 m denselben Rang,
+  // damit Maßnahmen als zusammenhängende Flächen entstehen und nicht als
+  // einzelne 2-m-Pünktchen. Ein kleiner Zusatz ordnet die Zellen im Fleck.
+  const patch = Math.max(1, Math.round(PATCH_SIZE_M / cellSizeM))
+  if (patch === 1) return randomList(random, count)
+  const height = Math.ceil(count / width)
+  const patchesX = Math.ceil(width / patch)
+  const patchRanks = randomList(random, patchesX * Math.ceil(height / patch))
+  return Array.from({ length: count }, (_, index) => {
+    const x = index % width
+    const y = Math.floor(index / width)
+    const patchRank = patchRanks[Math.floor(y / patch) * patchesX + Math.floor(x / patch)]
+    return Math.min(0.999999, patchRank + random() * 1e-6)
+  })
 }
+
+/** Kantenlänge der Flecken, in denen Maßnahmen gemeinsam umgesetzt werden. */
+const PATCH_SIZE_M = 10
+
+/** Gruppen, in denen sich Maßnahmen die Flächen teilen, in Katalog-Reihenfolge. */
+const EXCLUSIVE_GROUPS = (['roof', 'square'] as const).map((target) =>
+  MEASURES.filter((measure) => measure.exclusive && measure.target === target),
+)
 
 /**
  * Wendet die Maßnahmen auf ein Raster an und gibt ein neues Raster zurück.
  *
- * Teilen sich zwei Maßnahmen dieselben Flächen (Gründach und Cool Roof,
- * Bäume und Entsiegelung), kommt die erste zuerst zum Zug und die zweite
- * erhält höchstens den Rest.
+ * Teilen sich mehrere Maßnahmen dieselben Flächen (z. B. Gründach und
+ * Cool Roof auf dunklen Dächern), kommen sie in der Reihenfolge des Katalogs
+ * zum Zug: Die erste erhält ihren Anteil, die nächste den folgenden Anteil
+ * und so weiter, zusammen höchstens alle Flächen.
+ *
+ * Zisterne und Sprühnebel kommen zusätzlich hinzu. Sie nutzen eigene,
+ * verschobene Ränge, damit sie nicht immer dieselben Zellen bevorzugen.
  */
 export function applyMeasures(base: CityGrid, measures: Measures, ranks: number[]): CityGrid {
-  const cells = base.cells.map((cell, index): GridCell => {
+  if (Object.values(measures).every((share) => share === 0)) return base
+  const cells = base.cells.map((original, index): GridCell => {
     const rank = ranks[index]
-    let surface = cell.surface
+    let cell = original
 
-    if (surface === 'roof') {
-      if (rank < measures.greenRoofs) surface = 'greenRoof'
-      else if (rank < measures.greenRoofs + measures.coolRoofs) surface = 'coolRoof'
-    } else if (!cell.street && (surface === 'concrete' || surface === 'asphalt')) {
-      // Höfe, Plätze und Parkplätze, aber keine Straßen.
-      if (rank < measures.trees) surface = 'tree'
-      else if (rank < measures.trees + measures.unsealing) surface = 'permeable'
+    for (const group of EXCLUSIVE_GROUPS) {
+      if (!fitsTarget(cell, group[0].target)) continue
+      let upTo = 0
+      for (const measure of group) {
+        upTo += measures[measure.id]
+        if (rank < upTo) {
+          cell = measure.apply(cell)
+          break
+        }
+      }
     }
 
+    if (fitsTarget(cell, 'anyRoof') && (rank + 0.5) % 1 < measures.cistern) {
+      cell = MEASURE_BY_ID.cistern.apply(cell)
+    }
     // Sprühnebel nur dort, wo danach noch versiegelter Boden liegt.
-    const sealedGround = surface === 'asphalt' || surface === 'concrete'
-    // Eigener Rang (gespiegelt), damit Nebel nicht dieselben Zellen bevorzugt.
-    const mist = cell.mist || (sealedGround && 1 - rank < measures.mist)
-
-    return cell.street ? { surface, mist, street: true } : { surface, mist }
+    if (fitsTarget(cell, 'sealed') && 1 - rank < measures.mist) {
+      cell = MEASURE_BY_ID.mist.apply(cell)
+    }
+    return cell
   })
   return { ...base, cells }
 }

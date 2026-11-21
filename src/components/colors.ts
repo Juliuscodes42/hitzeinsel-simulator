@@ -3,6 +3,7 @@
  */
 
 import type { SurfaceType } from '../data/materials.ts'
+import type { MeasureId } from '../data/measures.ts'
 
 /** Stützstellen der Temperaturskala: [Temperatur in °C, Rot, Grün, Blau]. */
 const TEMPERATURE_STOPS: readonly (readonly [number, number, number, number])[] = [
@@ -52,4 +53,29 @@ export const SURFACE_COLORS: Record<SurfaceType, string> = {
   roof: '#7d4d3c',
   coolRoof: '#eef0f2',
   greenRoof: '#5aa37c',
+  coolPavement: '#d9d3bf',
+  blueGreenRoof: '#3f9a9a',
+}
+
+/** Farben der Überdachungen, als halb durchsichtige Schicht über dem Boden. */
+export const COVER_COLORS = {
+  pv: '#23365e',
+  sail: '#efe2b8',
+} as const
+
+/** Farbe je Maßnahme für Pinsel und Legende. */
+export const MEASURE_COLORS: Record<MeasureId, string> = {
+  greenRoof: SURFACE_COLORS.greenRoof,
+  blueGreenRoof: SURFACE_COLORS.blueGreenRoof,
+  coolRoof: SURFACE_COLORS.coolRoof,
+  cistern: '#5b7fa6',
+  tree: SURFACE_COLORS.tree,
+  treeTrench: '#1f5e3a',
+  unsealing: SURFACE_COLORS.permeable,
+  swale: '#9fd38a',
+  pond: SURFACE_COLORS.water,
+  coolPavement: SURFACE_COLORS.coolPavement,
+  pvCanopy: COVER_COLORS.pv,
+  shadeSail: COVER_COLORS.sail,
+  mist: '#d8f1ff',
 }

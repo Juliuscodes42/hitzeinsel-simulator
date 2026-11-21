@@ -31,6 +31,10 @@ aus dem Gedächtnis eingetragen und sind noch nicht am Original kontrolliert.
 | Starkregen | KOSTRA-DWD-2020, Deutscher Wetterdienst, Dauerstufe 60 Minuten, Wiederkehrzeiten 5, 30 und 100 Jahre, 5-km-Raster (ETRS89-LAEA). Lizenz CC BY 4.0 (dwd.de/copyright). Aufbereitet mit `scripts/build-kostra.py`. | `src/model/heavyRain.ts`, `src/data/kostra.json` |
 | Oberflächentemperatur aus dem All | Landsat 8/9 Collection 2 Level-2 Surface Temperature (Band ST_B10), U.S. Geological Survey, gemeinfrei. Abgerufen über den Microsoft Planetary Computer. | `scripts/build-places.ts`, `src/model/validation.ts` |
 
+## Kosten der Maßnahmen
+
+Alle Kosten, Spannweiten und Quellen stehen in `docs/kosten.md`.
+
 ## Eigene Annahmen ohne Quelle
 
 Diese Werte stammen nicht aus der Literatur. Sie stehen im

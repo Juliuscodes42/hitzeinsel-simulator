@@ -19,6 +19,8 @@ export type SurfaceType =
   | 'roof'
   | 'coolRoof'
   | 'greenRoof'
+  | 'coolPavement'
+  | 'blueGreenRoof'
 
 /**
  * Wie eine Oberfläche Wärme speichert.
@@ -147,6 +149,29 @@ export const MATERIALS: Record<SurfaceType, Material> = {
     moistureAvailability: 0.4,
     runoffCoefficient: 0.5,
     storage: { kind: 'layer', arealHeatCapacity: 2.0e5, deepCoupling: 0.4, deepTempC: 22 },
+    isRoof: true,
+  },
+  // Neue Oberflächen stehen am Ende, weil gespeicherte Raster die Reihenfolge nutzen.
+  coolPavement: {
+    // Heller, reflektierender Belag (Beschichtung auf Asphalt). Albedo neu etwa 0,3–0,45,
+    // nach einigen Jahren geringer; hier ein mittlerer Wert (LBNL Heat Island Group).
+    label: 'Heller Belag',
+    albedo: 0.35,
+    emissivity: 0.9,
+    moistureAvailability: 0,
+    runoffCoefficient: 0.9,
+    storage: { kind: 'ground', volumetricHeatCapacity: 1.94e6, conductivity: 0.75 },
+    isRoof: false,
+  },
+  blueGreenRoof: {
+    // Gründach mit Wasserspeicher (Retentionsdach): 30–100 l/m² Speicher (Baunetz Wissen),
+    // dadurch feuchter als ein normales Gründach und mit weniger Abfluss. Feuchte: Annahme.
+    label: 'Retentions-Gründach',
+    albedo: 0.2,
+    emissivity: 0.95,
+    moistureAvailability: 0.55,
+    runoffCoefficient: 0.1,
+    storage: { kind: 'layer', arealHeatCapacity: 3.0e5, deepCoupling: 0.4, deepTempC: 22 },
     isRoof: true,
   },
 }

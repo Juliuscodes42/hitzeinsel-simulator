@@ -38,7 +38,7 @@ deaktiviert sind, stattdessen `npm.cmd test` bzw. `npm.cmd run dev` verwenden.
    1. °C statt K, Meer und Wasserflächen erkennen ✓
    2. Wetter je Region: typischer Hitzetag und KOSTRA-Starkregen ✓
    3. Bilderkennung mit 2-m-Zellen, Lernen aus Beispielpunkten, Genauigkeit ✓
-   4. Mehr Maßnahmen mit belegten Kosten
+   4. Mehr Maßnahmen mit belegten Kosten ✓ (siehe docs/kosten.md)
    5. Budget mit Folgekosten, Förderung und Zielvorgabe
 10. Optional: KI-Erklärtext
 

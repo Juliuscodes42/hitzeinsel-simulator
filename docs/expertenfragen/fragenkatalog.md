@@ -44,7 +44,8 @@ Betrifft `src/model/energyBalance.ts`.
 |---|---|---|---|
 | D1 | Wie stark kühlen Sprühnebel-Anlagen auf Plätzen in der Praxis, und wie viel Wasser brauchen sie pro Stunde und Quadratmeter? | Fläche gilt 10–20 Uhr als feucht (m = 0,6), kein Wasserverbrauch | offen |
 | D2 | Welche Albedo hat ein Cool Roof nach einigen Jahren Verschmutzung noch? | 0,70 (neu) | offen |
-| D3 | Was kosten die Maßnahmen ungefähr pro Quadratmeter (Entsiegelung, extensives Gründach, Cool-Roof-Anstrich, Baumpflanzung)? Wir brauchen das für den Vergleich „Kühlung pro Euro". | noch keine Werte | offen |
+| D3 | Was kosten die Maßnahmen bei Ihnen ungefähr pro Quadratmeter? Unsere Richtwerte aus Ratgebern stehen in `docs/kosten.md`; am unsichersten sind Sonnensegel, heller Belag, Retentionsdach und Sprühnebel. | Werte aus `docs/kosten.md` | offen |
+| D4 | Wie viel Sonne lassen Sonnensegel und Solardächer über Parkplätzen durch, und wie stark kühlen sie den Boden darunter? | Segel 20 %, Solardach 5 % | offen |
 
 ## E. Regenwasser
 

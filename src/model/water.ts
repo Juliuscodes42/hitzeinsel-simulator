@@ -22,9 +22,13 @@ export interface RainBalance {
 export function rainBalance(grid: CityGrid, rainMm: number): RainBalance {
   const cellArea = grid.cellSizeM ** 2
   const rainfallL = rainMm * cellArea * grid.cells.length
-  const retainedL = grid.cells.reduce(
+  const surfaceRetainedL = grid.cells.reduce(
     (sum, cell) => sum + (1 - MATERIALS[cell.surface].runoffCoefficient) * rainMm * cellArea,
     0,
   )
+  // Speicher (Mulden, Rigolen, Zisternen, Retentionsdächer) fangen Abfluss auf,
+  // bis sie voll sind. Vereinfachung: Das Wasser der Umgebung erreicht sie.
+  const storageL = grid.cells.reduce((sum, cell) => sum + (cell.storageL ?? 0) * cellArea, 0)
+  const retainedL = surfaceRetainedL + Math.min(rainfallL - surfaceRetainedL, storageL)
   return { rainfallL, retainedL, runoffL: rainfallL - retainedL }
 }

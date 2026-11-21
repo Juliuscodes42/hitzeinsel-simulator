@@ -14,7 +14,7 @@
  * einer Maßnahme nur von ihrer eigenen Zelle ab.
  */
 
-import type { SurfaceType } from '../data/materials.ts'
+import { MEASURES, MEASURE_BY_ID, canApply, type MeasureId } from '../data/measures.ts'
 import type { Weather } from './atmosphere.ts'
 import { simulateDay, surfaceTempAt, type DayResult } from './energyBalance.ts'
 import { conditionsAt, type CityGrid, type GridCell } from './grid.ts'
@@ -28,33 +28,24 @@ export const GOAL_LABELS: Record<Goal, string> = {
   night: 'Nächtlicher Hitzestau (4 Uhr)',
 }
 
-export type ActionKind = 'greenRoof' | 'coolRoof' | 'tree' | 'permeable' | 'mist'
+/** Maßnahmen, die der Optimierer verwenden kann: alle, die kühlen. */
+export type ActionKind = MeasureId
 
-export const ACTION_KINDS: ActionKind[] = ['greenRoof', 'coolRoof', 'tree', 'permeable', 'mist']
+export const ACTION_KINDS: ActionKind[] = MEASURES.filter((measure) => measure.cools).map(
+  (measure) => measure.id,
+)
 
-export const ACTION_LABELS: Record<ActionKind, string> = {
-  greenRoof: 'Dachbegrünung',
-  coolRoof: 'Cool Roof',
-  tree: 'Laubbäume',
-  permeable: 'Entsiegelung',
-  mist: 'Sprühnebel',
-}
+export const ACTION_LABELS = Object.fromEntries(
+  MEASURES.map((measure) => [measure.id, measure.label]),
+) as Record<ActionKind, string>
 
 /** Kosten je Quadratmeter in Euro. */
 export type CostTable = Record<ActionKind, number>
 
-/**
- * Grobe Richtwerte für Bau bzw. Installation, ohne laufende Kosten.
- * Eigene Annahmen, die mit Fachleuten abgestimmt werden müssen
- * (Frage D3 im Fragenkatalog). In der App lassen sie sich ändern.
- */
-export const DEFAULT_COSTS: CostTable = {
-  greenRoof: 60,
-  coolRoof: 25,
-  tree: 100,
-  permeable: 80,
-  mist: 50,
-}
+/** Baukosten aus dem Maßnahmenkatalog (Quellen in docs/kosten.md). In der App änderbar. */
+export const DEFAULT_COSTS = Object.fromEntries(
+  MEASURES.map((measure) => [measure.id, measure.cost.build]),
+) as CostTable
 
 export interface Action {
   /** Index der Zelle im Raster. */
@@ -86,19 +77,11 @@ const goalValue = (result: DayResult, goal: Goal): number =>
   goal === 'day' ? surfaceTempAt(result, 15) : goal === 'night' ? surfaceTempAt(result, 4) : result.meanC
 
 /** Die Zelle nach einer Maßnahme. */
-function applyAction(cell: GridCell, kind: ActionKind): GridCell {
-  if (kind === 'mist') return { ...cell, mist: true }
-  return { ...cell, surface: kind satisfies SurfaceType, mist: false }
-}
+const applyAction = (cell: GridCell, kind: ActionKind): GridCell => MEASURE_BY_ID[kind].apply(cell)
 
-/** Welche Maßnahmen sind auf dieser Zelle möglich? */
+/** Welche kühlenden Maßnahmen sind auf dieser Zelle möglich? */
 export function possibleActions(cell: GridCell): ActionKind[] {
-  if (cell.surface === 'roof') return ['greenRoof', 'coolRoof']
-  const sealedGround = cell.surface === 'asphalt' || cell.surface === 'concrete'
-  if (!sealedGround) return []
-  const kinds: ActionKind[] = cell.street ? [] : ['tree', 'permeable']
-  if (!cell.mist) kinds.push('mist')
-  return kinds
+  return ACTION_KINDS.filter((kind) => canApply(cell, MEASURE_BY_ID[kind]))
 }
 
 interface Option {

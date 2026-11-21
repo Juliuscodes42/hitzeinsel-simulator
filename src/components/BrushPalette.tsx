@@ -1,14 +1,17 @@
 import { MATERIALS, SURFACE_TYPES, type SurfaceType } from '../data/materials.ts'
-import { SURFACE_COLORS } from './colors.ts'
+import { MEASURES, type MeasureId } from '../data/measures.ts'
+import { MEASURE_COLORS, SURFACE_COLORS } from './colors.ts'
 
 /** Was ein Klick auf eine Zelle bewirkt. null = nur ansehen. */
 export type Brush =
   | { kind: 'surface'; surface: SurfaceType }
-  | { kind: 'mist' }
+  | { kind: 'measure'; measure: MeasureId }
   | { kind: 'erase' }
   | null
 
 interface BrushPaletteProps {
+  /** Oberflächen (Korrektur des Ist-Zustands) oder Maßnahmen (Umbau). */
+  mode: 'surfaces' | 'measures'
   brush: Brush
   onChange: (brush: Brush) => void
   /** Anzahl der von Hand veränderten Zellen. */
@@ -24,14 +27,13 @@ interface BrushPaletteProps {
 /** Wählbare Pinselgrößen als Radius in Zellen. */
 const BRUSH_SIZES = [0, 1, 2, 4]
 
-const isSurface = (brush: Brush, surface: SurfaceType): boolean =>
-  brush?.kind === 'surface' && brush.surface === surface
-
 /**
- * Auswahl des Pinsels. Die Farbfelder dienen zugleich als Legende
- * für die Flächenansicht.
+ * Auswahl des Pinsels. Die Farbfelder dienen zugleich als Legende.
+ * Im Modus „Maßnahmen" wirkt der Pinsel nur dort, wo die Maßnahme möglich ist
+ * (z. B. Gründach nur auf dunklen Dächern).
  */
 export function BrushPalette({
+  mode,
   brush,
   onChange,
   paintedCount,
@@ -40,6 +42,25 @@ export function BrushPalette({
   onSizeChange,
   cellSizeM = 10,
 }: BrushPaletteProps) {
+  const options =
+    mode === 'surfaces'
+      ? SURFACE_TYPES.map((surface) => ({
+          key: surface,
+          label: MATERIALS[surface].label,
+          color: SURFACE_COLORS[surface],
+          title: undefined as string | undefined,
+          pressed: brush?.kind === 'surface' && brush.surface === surface,
+          pick: (): Brush => ({ kind: 'surface', surface }),
+        }))
+      : MEASURES.map((measure) => ({
+          key: measure.id,
+          label: measure.label,
+          color: MEASURE_COLORS[measure.id],
+          title: measure.effect,
+          pressed: brush?.kind === 'measure' && brush.measure === measure.id,
+          pick: (): Brush => ({ kind: 'measure', measure: measure.id }),
+        }))
+
   return (
     <div className="palette">
       {size !== undefined && onSizeChange && (
@@ -69,31 +90,19 @@ export function BrushPalette({
           <span className="swatch-color swatch-look" aria-hidden="true" />
           Nur ansehen
         </button>
-        {SURFACE_TYPES.map((surface) => (
+        {options.map((option) => (
           <button
-            key={surface}
+            key={option.key}
             type="button"
             className="swatch"
-            aria-pressed={isSurface(brush, surface)}
-            onClick={() => onChange({ kind: 'surface', surface })}
+            title={option.title}
+            aria-pressed={option.pressed}
+            onClick={() => onChange(option.pick())}
           >
-            <span
-              className="swatch-color"
-              style={{ background: SURFACE_COLORS[surface] }}
-              aria-hidden="true"
-            />
-            {MATERIALS[surface].label}
+            <span className="swatch-color" style={{ background: option.color }} aria-hidden="true" />
+            {option.label}
           </button>
         ))}
-        <button
-          type="button"
-          className="swatch"
-          aria-pressed={brush?.kind === 'mist'}
-          onClick={() => onChange({ kind: 'mist' })}
-        >
-          <span className="swatch-color swatch-mist" aria-hidden="true" />
-          Sprühnebel
-        </button>
         <button
           type="button"
           className="swatch"
@@ -106,7 +115,9 @@ export function BrushPalette({
       </div>
       <p className="palette-status">
         {paintedCount === 0
-          ? 'Pinsel wählen, dann im Raster klicken oder ziehen.'
+          ? mode === 'measures'
+            ? 'Maßnahme wählen, dann im Raster klicken oder ziehen. Sie wirkt nur auf geeigneten Flächen.'
+            : 'Pinsel wählen, dann im Raster klicken oder ziehen.'
           : `${paintedCount} ${paintedCount === 1 ? 'Zelle' : 'Zellen'} von Hand geändert.`}{' '}
         {paintedCount > 0 && (
           <button type="button" className="link-button" onClick={onClear}>

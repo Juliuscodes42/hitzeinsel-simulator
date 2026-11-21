@@ -65,13 +65,13 @@ describe('Maßnahmen', () => {
   })
 
   test('100 % Dachbegrünung lässt kein dunkles Dach übrig', () => {
-    const result = applyMeasures(base, { ...NO_MEASURES, greenRoofs: 1 }, ranks)
+    const result = applyMeasures(base, { ...NO_MEASURES, greenRoof: 1 }, ranks)
     expect(count(result, 'roof')).toBe(0)
     expect(count(result, 'greenRoof')).toBe(count(base, 'roof'))
   })
 
   test('Gründach und Cool Roof teilen sich die Dächer', () => {
-    const result = applyMeasures(base, { ...NO_MEASURES, greenRoofs: 0.6, coolRoofs: 1 }, ranks)
+    const result = applyMeasures(base, { ...NO_MEASURES, greenRoof: 0.6, coolRoof: 1 }, ranks)
     expect(count(result, 'roof')).toBe(0)
     expect(count(result, 'greenRoof') + count(result, 'coolRoof')).toBe(count(base, 'roof'))
     expect(count(result, 'greenRoof')).toBeGreaterThan(0)
@@ -79,7 +79,7 @@ describe('Maßnahmen', () => {
   })
 
   test('Bäume und Entsiegelung ersetzen nur Pflaster, keine Straßen', () => {
-    const result = applyMeasures(base, { ...NO_MEASURES, trees: 0.5, unsealing: 0.5 }, ranks)
+    const result = applyMeasures(base, { ...NO_MEASURES, tree: 0.5, unsealing: 0.5 }, ranks)
     expect(count(result, 'concrete')).toBe(0)
     expect(count(result, 'asphalt')).toBe(count(base, 'asphalt'))
     expect(sealedShare(result)).toBeLessThan(sealedShare(base))

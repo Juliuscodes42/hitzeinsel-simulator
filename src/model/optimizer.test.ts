@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { MEASURE_BY_ID } from '../data/measures.ts'
 import { DEFAULT_WEATHER } from './atmosphere.ts'
 import { applyOverrides, generateDistrict } from './district.ts'
 import { simulateGrid, type CityGrid, type GridCell } from './grid.ts'
@@ -39,20 +40,29 @@ function randomSpending(budget: number, seed: number): Map<number, GridCell> {
     const cost = DEFAULT_COSTS[kind] * 100
     if (cost > remaining) continue
     remaining -= cost
-    cells.set(
-      index,
-      kind === 'mist'
-        ? { ...grid.cells[index], mist: true }
-        : { ...grid.cells[index], surface: kind, mist: false },
-    )
+    cells.set(index, MEASURE_BY_ID[kind].apply(grid.cells[index]))
   }
   return cells
 }
 
 describe('Mögliche Maßnahmen', () => {
   test('Dächer, Höfe und Straßen bekommen unterschiedliche Angebote', () => {
-    expect(possibleActions({ surface: 'roof', mist: false })).toEqual(['greenRoof', 'coolRoof'])
-    expect(possibleActions({ surface: 'concrete', mist: false })).toEqual(['tree', 'permeable', 'mist'])
+    expect(possibleActions({ surface: 'roof', mist: false })).toEqual([
+      'greenRoof',
+      'blueGreenRoof',
+      'coolRoof',
+    ])
+    expect(possibleActions({ surface: 'concrete', mist: false })).toEqual([
+      'tree',
+      'treeTrench',
+      'unsealing',
+      'swale',
+      'pond',
+      'coolPavement',
+      'pvCanopy',
+      'shadeSail',
+      'mist',
+    ])
     expect(possibleActions({ surface: 'asphalt', mist: false, street: true })).toEqual(['mist'])
     expect(possibleActions({ surface: 'grass', mist: false })).toEqual([])
     expect(possibleActions({ surface: 'greenRoof', mist: false })).toEqual([])

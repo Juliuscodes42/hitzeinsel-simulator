@@ -153,9 +153,11 @@ export function OptimizerPanel({ grid, weather, onApply }: OptimizerPanelProps) 
           ))}
         </div>
         <p className="note">
-          Die Kosten sind grobe eigene Annahmen ohne laufende Kosten (Wasser, Pflege). Der
-          Optimierer gibt das Budget in der Reihenfolge „meiste Kühlung pro Euro zuerst" aus.
-          Jede Fläche erhält höchstens eine Maßnahme. Straßen bekommen nur Sprühnebel.
+          Baukosten aus dem Maßnahmenkatalog (Richtwerte aus Ratgebern und Kommunen, Quellen
+          in docs/kosten.md), ohne Pflege und Förderung. Der Optimierer gibt das Budget in der
+          Reihenfolge „meiste Kühlung pro Euro zuerst" aus. Jede Fläche erhält höchstens eine
+          Maßnahme, Sprühnebel kommt zusätzlich. Straßen bekommen nur Sprühnebel. Zisternen
+          kühlen nicht und werden deshalb nicht vorgeschlagen.
         </p>
       </details>
     </div>

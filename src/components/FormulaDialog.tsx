@@ -140,7 +140,15 @@ export function FormulaDialog({ open, onClose, weather, hour }: FormulaDialogPro
             und was das kostet. Das Budget wird dann in der Reihenfolge „meiste Kühlung pro Euro
             zuerst" ausgegeben (Greedy-Verfahren für ein Rucksackproblem). Weil das Modell
             Nachbarflächen nicht koppelt, hängt der Nutzen einer Maßnahme nur von ihrer eigenen
-            Fläche ab. Die Kosten je Quadratmeter sind grobe eigene Annahmen.
+            Fläche ab. Die Kosten je Quadratmeter stammen aus dem Maßnahmenkatalog
+            (Richtwerte mit Quellen, siehe docs/kosten.md).
+          </p>
+          <p>
+            Solardächer und Sonnensegel lassen 5 % bzw. 20 % der Sonne durch: s = 1 − (1 −
+            s_Gebäude) · (1 − s_Dach). Sie verdecken außerdem 70 % des Himmels (ψ · 0,3), weil ihre
+            warme Unterseite die Abstrahlung nach oben behindert. Mulden, Rigolen, Zisternen und
+            Retentionsdächer fangen zusätzlich Regen auf, bis ihr Speicher voll ist:
+            Rückhalt = Σ (1 − ψ_A) · N · A + min(Abfluss, Σ Speicher).
           </p>
 
           <h3>8. Bilderkennung der Flächen</h3>

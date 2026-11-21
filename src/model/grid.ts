@@ -7,6 +7,7 @@
  */
 
 import { MATERIALS, type SurfaceType } from '../data/materials.ts'
+import type { MeasureId } from '../data/measures.ts'
 import type { Weather } from './atmosphere.ts'
 import {
   OPEN_CONDITIONS,
@@ -21,6 +22,14 @@ export interface GridCell {
   mist: boolean
   /** Verkehrsfläche (Straße, Weg): Maßnahmen bauen sie nicht um. */
   street?: boolean
+  /** Maßnahme, durch die die Zelle entstanden ist (fehlt im Ist-Zustand). */
+  measure?: MeasureId
+  /** Überdachung über dem Boden: Solardach oder Sonnensegel. */
+  cover?: 'pv' | 'sail'
+  /** Zusätzlicher Regenwasserspeicher in Litern pro m² (Mulde, Rigole, Zisterne). */
+  storageL?: number
+  /** Auf diesem Dach gibt es eine Zisterne. */
+  cistern?: boolean
 }
 
 export interface CityGrid {
@@ -48,6 +57,15 @@ const DENSITY_STEP = 0.05
 const SKY_VIEW_LOSS = 0.6 // ψ = 1 − 0,6·d
 const SHADE_GAIN = 0.5 // s = 0,5·d
 const WIND_LOSS = 0.6 // u_Boden = u·(1 − 0,6·d)
+
+/**
+ * Überdachungen (eigene Annahmen, Frage D4 im Fragenkatalog):
+ * Ein Solardach lässt etwa 5 % der Sonne durch, ein Sonnensegel etwa 20 %.
+ * Beide verdecken den größten Teil des Himmels; die Unterseite ist warm,
+ * deshalb kühlt der Boden nachts kaum noch durch Abstrahlung.
+ */
+export const COVER_SHADE = { pv: 0.95, sail: 0.8 } as const
+const COVER_SKY_VIEW = 0.3
 
 /** Erzeugt ein Raster, das vollständig aus einer Oberfläche besteht. */
 export function createUniformGrid(
@@ -119,13 +137,19 @@ export function conditionsFor(cell: GridCell, density: number): CellConditions {
   if (MATERIALS[cell.surface].isRoof) {
     return { ...OPEN_CONDITIONS, surface: cell.surface, mist: cell.mist }
   }
-  return {
+  const conditions: CellConditions = {
     surface: cell.surface,
     skyViewFactor: 1 - SKY_VIEW_LOSS * density,
     shade: SHADE_GAIN * density,
     windFactor: 1 - WIND_LOSS * density,
     mist: cell.mist,
   }
+  if (cell.cover) {
+    // Schatten von Gebäuden und Dach zusammen: Durchgelassenes wird multipliziert.
+    conditions.shade = 1 - (1 - conditions.shade) * (1 - COVER_SHADE[cell.cover])
+    conditions.skyViewFactor *= COVER_SKY_VIEW
+  }
+  return conditions
 }
 
 /**
@@ -155,7 +179,7 @@ export function simulateGrid(grid: CityGrid, weather: Weather): GridResult {
   const cache = new Map<string, DayResult>()
   const cells = grid.cells.map((cell, index) => {
     const conditions = conditionsAt(grid, index, cell)
-    const key = `${cell.surface}|${cell.mist}|${conditions.skyViewFactor.toFixed(3)}`
+    const key = `${cell.surface}|${cell.mist}|${cell.cover ?? ''}|${conditions.skyViewFactor.toFixed(3)}`
     let result = cache.get(key)
     if (!result) {
       result = simulateDay(conditions, weather)
