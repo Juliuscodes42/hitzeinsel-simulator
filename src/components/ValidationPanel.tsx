@@ -58,10 +58,10 @@ export function ValidationPanel({ corrections }: ValidationPanelProps) {
       <div className="kpis">
         <div className="kpi">
           <p className="kpi-label">Mittlere Abweichung (Betrag)</p>
-          <p className="kpi-value">{formatNumber(summary.meanAbsErrorK)} K</p>
+          <p className="kpi-value">{formatNumber(summary.meanAbsErrorK)} °C</p>
           <p className="kpi-note">
             {anyCorrected
-              ? `ohne Korrekturen: ${formatNumber(originalSummary.meanAbsErrorK)} K`
+              ? `ohne Korrekturen: ${formatNumber(originalSummary.meanAbsErrorK)} °C`
               : `${summary.count} Aufnahmen`}
           </p>
         </div>
@@ -148,7 +148,7 @@ export function ValidationPanel({ corrections }: ValidationPanelProps) {
           </li>
           <li>
             Der Satellit sieht von oben auf Dächer und Baumkronen und nimmt für alle Flächen
-            geschätzte Emissionsgrade an. Auch seine Werte haben einen Fehler von etwa 1 bis 2 K.
+            geschätzte Emissionsgrade an. Auch seine Werte haben einen Fehler von etwa 1 bis 2 °C.
           </li>
           <li>
             Wenige Aufnahmen an vier Orten sind eine Stichprobe und kein Beweis. Stand der

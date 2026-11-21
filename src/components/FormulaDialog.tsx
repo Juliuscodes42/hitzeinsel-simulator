@@ -61,6 +61,11 @@ export function FormulaDialog({ open, onClose, weather, hour }: FormulaDialogPro
             von 60 Sekunden (Euler-Verfahren). Derselbe Tag wird sechsmal wiederholt, bis sich
             ein stabiler Tagesgang eingestellt hat.
           </p>
+          <p className="note">
+            Einheiten: In den Formeln steht die Temperatur in Kelvin (T in K = T in °C + 273,15).
+            Unterschiede zeigt die App in °C an. Ein Unterschied von 1 °C ist genau 1 K, die
+            Zahl bleibt also dieselbe.
+          </p>
 
           <h3>2. Strahlungsbilanz Q* (Stefan-Boltzmann, Albedo)</h3>
           <Formula>

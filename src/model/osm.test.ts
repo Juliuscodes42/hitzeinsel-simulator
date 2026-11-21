@@ -112,4 +112,73 @@ describe('OSM-Daten rastern', () => {
     expect(cellAt([lake, forest], 2, 15).surface).toBe('water')
     expect(cellAt([lake, forest], 15, 2).surface).toBe('tree')
   })
+  test('außen liegende Ringe aus mehreren Wegen werden zusammengesetzt', () => {
+    // Ein See als Multipolygon, dessen Außenring aus zwei offenen Wegen besteht.
+    const lake: OsmElement = {
+      type: 'relation',
+      tags: { type: 'multipolygon', natural: 'water' },
+      members: [
+        { type: 'way', role: 'outer', geometry: [at(0, 100), at(200, 100), at(200, 200)] },
+        { type: 'way', role: 'outer', geometry: [at(0, 100), at(0, 200), at(200, 200)] },
+      ],
+    }
+    expect(cellAt([lake], 10, 15).surface).toBe('water')
+    expect(cellAt([lake], 10, 5).surface).toBe('grass')
+  })
+
+  test('ein Fluss, der nur als Linie eingetragen ist, wird Wasser', () => {
+    const river: OsmElement = {
+      type: 'way',
+      tags: { waterway: 'river' },
+      geometry: [at(0, 105), at(200, 105)],
+    }
+    expect(cellAt([river], 10, 10).surface).toBe('water')
+    expect(cellAt([river], 10, 2).surface).toBe('grass')
+  })
+})
+
+describe('Meer an der Küste', () => {
+  // Küstenlinie von West nach Ost in 100 m Abstand vom Nordrand.
+  // Land liegt links (Norden), Meer rechts (Süden).
+  const coast: OsmElement = {
+    type: 'way',
+    tags: { natural: 'coastline' },
+    geometry: [at(-50, 100), at(250, 100)],
+  }
+
+  test('rechts der Küstenlinie liegt Meer, links Land', () => {
+    expect(cellAt([coast], 10, 15).surface).toBe('water')
+    expect(cellAt([coast], 10, 4).surface).toBe('grass')
+  })
+
+  test('Meer gilt nicht als geschätzt', () => {
+    const { guessedShare } = rasterizeOsm([coast], bbox)
+    expect(guessedShare).toBeCloseTo(0.5, 5)
+  })
+
+  test('umgekehrte Richtung tauscht Land und Meer', () => {
+    const reversed = { ...coast, geometry: [...coast.geometry!].reverse() }
+    expect(cellAt([reversed], 10, 15).surface).toBe('grass')
+    expect(cellAt([reversed], 10, 4).surface).toBe('water')
+  })
+
+  test('an einer Landzunge (Knick) stimmt die Seite auch nahe der Spitze', () => {
+    // Küste kommt von Süden, knickt bei (100, 50) und läuft wieder nach Süden zurück.
+    // Land liegt links, also innerhalb der Zunge; rundherum ist Meer.
+    const spit: OsmElement = {
+      type: 'way',
+      tags: { natural: 'coastline' },
+      geometry: [at(150, 250), at(100, 50), at(50, 250)],
+    }
+    expect(cellAt([spit], 10, 15).surface).toBe('grass') // in der Zunge
+    expect(cellAt([spit], 10, 2).surface).toBe('water') // vor der Spitze
+    expect(cellAt([spit], 1, 15).surface).toBe('water') // westlich daneben
+  })
+
+  test('Küstenlinien aus mehreren Wegen werden verbunden', () => {
+    const west: OsmElement = { type: 'way', tags: { natural: 'coastline' }, geometry: [at(-50, 100), at(100, 100)] }
+    const east: OsmElement = { type: 'way', tags: { natural: 'coastline' }, geometry: [at(100, 100), at(250, 100)] }
+    expect(cellAt([west, east], 10, 15).surface).toBe('water')
+    expect(cellAt([west, east], 10, 4).surface).toBe('grass')
+  })
 })

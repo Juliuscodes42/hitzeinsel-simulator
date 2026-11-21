@@ -88,7 +88,7 @@ export function OptimizerPanel({ grid, weather, onApply }: OptimizerPanelProps) 
               {proposal.actions.length} Flächen ({formatNumber(proposal.actions.length * cellArea, 0)} m²)
             </b>{' '}
             umbauen. Das kühlt das Viertel im Ziel „{GOAL_LABELS[goal]}" um{' '}
-            <b>{formatNumber(proposal.coolingK, 2)} K</b>. Am meisten trägt{' '}
+            <b>{formatNumber(proposal.coolingK, 2)} °C</b>. Am meisten trägt{' '}
             <b>{ACTION_LABELS[used[0]]}</b> bei.
           </p>
 
@@ -111,8 +111,8 @@ export function OptimizerPanel({ grid, weather, onApply }: OptimizerPanelProps) 
                       <th scope="row">{ACTION_LABELS[kind]}</th>
                       <td>{summary.count}</td>
                       <td>{formatEuro(summary.cost)}</td>
-                      <td>{formatNumber(summary.coolingK, 2)} K</td>
-                      <td>{formatNumber((summary.coolingK / summary.cost) * 100_000, 2)} K</td>
+                      <td>{formatNumber(summary.coolingK, 2)} °C</td>
+                      <td>{formatNumber((summary.coolingK / summary.cost) * 100_000, 2)} °C</td>
                     </tr>
                   )
                 })}

@@ -11,10 +11,13 @@ export const formatTemp = (tempC: number): string => `${formatNumber(tempC)} °C
 
 export const formatPercent = (share: number): string => `${Math.round(share * 100)} %`
 
-/** Temperaturunterschied mit Vorzeichen, z. B. "−3,2 K". */
+/**
+ * Temperaturunterschied mit Vorzeichen, z. B. "−3,2 °C".
+ * Physikalisch korrekt wäre K; ein Unterschied von 1 K ist genau 1 °C.
+ */
 export function formatDelta(deltaK: number): string {
   const sign = deltaK > 0.05 ? '+' : deltaK < -0.05 ? '−' : '±'
-  return `${sign}${formatNumber(Math.abs(deltaK))} K`
+  return `${sign}${formatNumber(Math.abs(deltaK))} °C`
 }
 
 /** Uhrzeit aus Dezimalstunden, z. B. 15.5 → "15:30". */

@@ -5,6 +5,10 @@
  * bestimmt, was dort laut OSM liegt (Gebäude, Straße, Parkplatz, Grün …).
  * Die häufigste Oberfläche gewinnt die Zelle.
  *
+ * Wasser: Seen und Flüsse sind in OSM Flächen oder Linien. Das Meer ist dagegen
+ * nur als Küstenlinie (natural=coastline) eingetragen. Nach OSM-Regel liegt das
+ * Land links und das Meer rechts der Linie, wenn man ihrer Richtung folgt.
+ *
  * Wo OSM nichts Genaues weiß, wird nach der Flächennutzung geschätzt
  * (Wohngebiet → Garten/Rasen, Gewerbe → Pflaster). Der Anteil geschätzter
  * Zellen wird zurückgegeben, damit man weiß, wie viel von Hand zu prüfen ist.
@@ -93,6 +97,15 @@ function surfaceFromTag(surface: string | undefined): SurfaceType | undefined {
   return 'concrete'
 }
 
+/** Halbe Breite eines Gewässers, das nur als Linie eingetragen ist. undefined = keins. */
+function waterwayHalfWidth(waterway: string | undefined): number | undefined {
+  if (waterway === 'river') return 8
+  if (waterway === 'canal') return 6
+  if (waterway === 'stream') return 1.5
+  if (waterway === 'ditch' || waterway === 'drain') return 0.75
+  return undefined
+}
+
 /** Halbe Breite und Standardbelag eines Wegs nach Straßenklasse. */
 function roadProfile(highway: string): { halfWidth: number; surface: SurfaceType } {
   if (['motorway', 'trunk', 'primary'].includes(highway)) return { halfWidth: 6, surface: 'asphalt' }
@@ -125,10 +138,13 @@ function classifyArea(
     tags.natural === 'water' ||
     ['riverbank', 'dock'].includes(tags.waterway) ||
     ['basin', 'reservoir'].includes(tags.landuse) ||
-    tags.leisure === 'swimming_pool'
+    tags.leisure === 'swimming_pool' ||
+    // Watt: bei Flut Wasser, bei Ebbe nasser Schlick. Beides verdunstet wie Wasser.
+    (tags.natural === 'wetland' && tags.wetland === 'tidalflat')
   ) {
     return explicit('water')
   }
+  if (['beach', 'sand'].includes(tags.natural)) return explicit(surfaceFromTag(tags.surface) ?? 'permeable')
   if (tags.natural === 'wood' || tags.landuse === 'forest' || tags.natural === 'scrub') {
     return explicit('tree')
   }
@@ -195,6 +211,88 @@ function nearLine(x: number, y: number, line: LineFeature, distance: number): bo
   return false
 }
 
+/**
+ * Liegt p rechts der Strecke a→b (in Blickrichtung von a nach b)?
+ * Im Rechenraum zeigt y nach Süden, deshalb ist das Vorzeichen umgekehrt
+ * zur üblichen Mathematik-Konvention.
+ */
+function rightOf(a: Point, b: Point, p: Point): boolean {
+  return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) > 0
+}
+
+/**
+ * Liegt ein Punkt auf der Meerseite der Küstenlinien? Entscheidend ist die
+ * nächstgelegene Strecke. Liegt der nächste Punkt genau auf einem Knick,
+ * entscheiden beide Strecken am Knick gemeinsam.
+ */
+function onSeaSide(x: number, y: number, coastlines: Point[][]): boolean {
+  const p: Point = [x, y]
+  let best = Infinity
+  let sea = false
+  for (const line of coastlines) {
+    for (let i = 0; i < line.length - 1; i++) {
+      const a = line[i]
+      const b = line[i + 1]
+      const distance = distanceSqToSegment(x, y, a, b)
+      if (distance >= best) continue
+      best = distance
+      const dx = b[0] - a[0]
+      const dy = b[1] - a[1]
+      const lengthSq = dx * dx + dy * dy
+      const t = lengthSq === 0 ? 0 : ((x - a[0]) * dx + (y - a[1]) * dy) / lengthSq
+      const previous = line[i - 1]
+      const next = line[i + 2]
+      if (t <= 0 && previous) {
+        sea = cornerSide(previous, a, b, p)
+      } else if (t >= 1 && next) {
+        sea = cornerSide(a, b, next, p)
+      } else {
+        sea = rightOf(a, b, p)
+      }
+    }
+  }
+  return sea
+}
+
+/** Meerseite an einem Knick v zwischen den Strecken a→v und v→b. */
+function cornerSide(a: Point, v: Point, b: Point, p: Point): boolean {
+  const rightTurn = rightOf(a, v, b)
+  // Bei einer Rechtskurve ist die Meerseite der spitze Winkel, sonst der stumpfe.
+  return rightTurn ? rightOf(a, v, p) && rightOf(v, b, p) : rightOf(a, v, p) || rightOf(v, b, p)
+}
+
+/**
+ * Setzt Linien, die sich an den Enden berühren, zu längeren Linien zusammen.
+ * In OSM bestehen große Flächen und Küsten oft aus vielen einzelnen Wegen.
+ */
+export function joinLines(lines: LatLon[][]): LatLon[][] {
+  const same = (a: LatLon, b: LatLon) => a.lat === b.lat && a.lon === b.lon
+  const open = lines.filter((line) => line.length >= 2).map((line) => [...line])
+  const joined: LatLon[][] = []
+  while (open.length > 0) {
+    let current = open.pop()!
+    let grown = true
+    while (grown && !same(current[0], current[current.length - 1])) {
+      grown = false
+      for (let i = 0; i < open.length; i++) {
+        const candidate = open[i]
+        const end = current[current.length - 1]
+        const start = current[0]
+        if (same(end, candidate[0])) current = [...current, ...candidate.slice(1)]
+        else if (same(end, candidate[candidate.length - 1])) current = [...current, ...[...candidate].reverse().slice(1)]
+        else if (same(start, candidate[candidate.length - 1])) current = [...candidate.slice(0, -1), ...current]
+        else if (same(start, candidate[0])) current = [...[...candidate].reverse().slice(0, -1), ...current]
+        else continue
+        open.splice(i, 1)
+        grown = true
+        break
+      }
+    }
+    joined.push(current)
+  }
+  return joined
+}
+
 const isClosed = (points: LatLon[]): boolean =>
   points.length >= 4 &&
   points[0].lat === points[points.length - 1].lat &&
@@ -218,6 +316,8 @@ export function rasterizeOsm(
   const buildings: AreaFeature[] = []
   const areas: AreaFeature[] = []
   const roads: LineFeature[] = []
+  const waterLines: LineFeature[] = []
+  const coastParts: LatLon[][] = []
   const treeRows: LineFeature[] = []
   const trees: Point[] = []
 
@@ -250,20 +350,36 @@ export function rasterizeOsm(
             surface: surfaceFromTag(tags.surface) ?? profile.surface,
           })
         }
+      } else if (tags.natural === 'coastline') {
+        // Auch geschlossene Küstenlinien (Inseln) werden über die Seite ausgewertet.
+        coastParts.push(element.geometry)
+      } else if (waterwayHalfWidth(tags.waterway) !== undefined) {
+        const skip = tags.tunnel === 'yes' || tags.tunnel === 'culvert' || tags.layer?.startsWith('-')
+        if (!skip) {
+          waterLines.push({
+            points: element.geometry.map(toPoint),
+            halfWidth: waterwayHalfWidth(tags.waterway)!,
+            surface: 'water',
+          })
+        }
       } else if (tags.natural === 'tree_row') {
         treeRows.push({ points: element.geometry.map(toPoint), halfWidth: TREE_RADIUS, surface: 'tree' })
       } else if (isClosed(element.geometry)) {
         addArea(tags, element.geometry)
       }
     } else if (element.type === 'relation' && tags.type === 'multipolygon') {
-      // Vereinfachung: nur geschlossene Außenringe, Löcher (inner) werden ignoriert.
-      for (const member of element.members ?? []) {
-        if (member.role === 'outer' && member.geometry && isClosed(member.geometry)) {
-          addArea(tags, member.geometry)
-        }
+      // Außenringe bestehen oft aus mehreren Wegen und werden erst zusammengesetzt.
+      // Vereinfachung: Löcher (inner) werden ignoriert.
+      const outer = (element.members ?? [])
+        .filter((member) => member.role === 'outer' && member.geometry)
+        .map((member) => member.geometry!)
+      for (const ring of joinLines(outer)) {
+        if (isClosed(ring)) addArea(tags, ring)
       }
     }
   }
+
+  const coastlines = joinLines(coastParts).map((line) => line.map(toPoint))
 
   // Kleine Flächen sind genauer als große, deshalb werden sie zuerst geprüft.
   // Ein Schulgelände in einem großen Park zählt also als Schulgelände.
@@ -276,6 +392,8 @@ export function rasterizeOsm(
     if (treeRows.some((row) => nearLine(x, y, row, row.halfWidth))) return 'tree'
     const road = roads.find((line) => nearLine(x, y, line, line.halfWidth))
     if (road) return `${road.surface}|street`
+    if (waterLines.some((line) => nearLine(x, y, line, line.halfWidth))) return 'water'
+    if (coastlines.length > 0 && onSeaSide(x, y, coastlines)) return 'water'
     const area = areas.find((candidate) => insideRing(x, y, candidate.ring))
     if (area) return area.guessed ? `${area.surface}|guessed` : area.surface
     return 'grass|guessed'
