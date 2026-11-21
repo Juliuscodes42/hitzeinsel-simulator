@@ -20,6 +20,7 @@ deaktiviert sind, stattdessen `npm.cmd test` bzw. `npm.cmd run dev` verwenden.
 | `src/model` | Physik-Modell, unabhängig von der Oberfläche |
 | `src/components` | Bausteine der Oberfläche |
 | `src/data` | Materialwerte mit Quellen, Beispielorte |
+| `docs/dokumentation.md` | Ausführliche Projektdokumentation im Aufbau einer Jugend-forscht-Arbeit |
 | `docs/expertenfragen` | Fragen an Fachleute, E-Mail-Vorlage, Antworten |
 | `docs/quellen.md` | Quellenliste für Formeln und Daten |
 | `scripts/build-places.ts` | Erzeugt die Beispielorte samt Landsat-Messwerten neu (`node scripts/build-places.ts`) |
